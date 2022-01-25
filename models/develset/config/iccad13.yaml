@@ -1,0 +1,51 @@
+exp_name: iccad13
+
+defaults:
+  - dataset: iccad13_tsdf
+
+hydra:
+  run:
+    dir: ${exp_name}_outputs
+  sweep:
+    dir: multiruns
+    subdir: ${exp_name}_outputs
+  job:
+    num: 0
+
+
+basic_path:  ${hydra:runtime.cwd}
+
+trainer:
+  gpus: 1
+  max_epochs: 30
+
+logger:
+  refresh: True # delete old logs
+  save_path: tb_loggers
+  log_metrics: True
+
+view:
+  save_img: False
+  save_img_last_epochs: 5
+  save_loss : False
+
+model:
+  loss_weights:
+    ilt_weight: 1
+    pvb_weight: 8.5
+  ilt_exp: 2 # the loss for ilt exponent (target - nominal)^(ilt_exp), must be int
+  ckpt:
+    save_time: ${now:%Y-%m-%d_%H-%M-%S}
+    save_path: ckpts_${model.ckpt.save_time}
+  add_curv: True # add curveture term
+  curv_weight: 1
+  torch_fft: False # use the torch original fft?
+
+kernel:
+  npy_path: ${basic_path}/kernels/np
+  opt_kernel: ${kernel.npy_path}/optKernel.npy
+  opt_kernel_scale: ${kernel.npy_path}/optKernel_scale.npy
+  combo_opt_kernel: ${kernel.npy_path}/comboOptKernel.npy
+  num_kernel_used:
+    opt_used: 15
+    combo_used: 9 # min: 1 max: 24

@@ -1,0 +1,1 @@
+python3 test_lt.py --dataroot ./datasets/iccad13v1 --name iccad13v1_lithotwin_fno --model litho_twin --gpu_ids 4 --batch_size 1 --lt_phase 1 --netG_A oinnopc --netG_B oinnlitho

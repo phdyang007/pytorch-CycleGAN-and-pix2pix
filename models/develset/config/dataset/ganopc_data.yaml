@@ -1,0 +1,5 @@
+# @package _group_
+basic_path: /home/guojin/data/datasets/develset/train
+targets_path: ${dataset.basic_path}/targets
+lsparams_path: ${dataset.basic_path}/ls_params
+batch_size: 1

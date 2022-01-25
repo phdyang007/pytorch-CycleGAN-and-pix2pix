@@ -1,0 +1,42 @@
+exp_name: ganopc
+
+defaults:
+  - dataset: ganopc_data
+
+hydra:
+  run:
+    dir: ${exp_name}_outputs
+
+basic_path: /home/guojin/projects/develset_opc/levelset_net/
+
+
+trainer:
+  gpus: 1
+  max_epochs: 40
+
+logger:
+  refresh: True # delete old logs
+  save_path: tb_loggers
+  log_metrics: True
+
+view:
+  save_img: False
+  save_img_last_epochs: 1
+  save_loss : False
+
+model:
+  loss_weights:
+    ilt_weight: 1
+    pvb_weight: 7.5
+  ckpt:
+    save_time: ${now:%Y-%m-%d_%H-%M-%S}
+    save_path: ckpts_${model.ckpt.save_time}
+  add_curv: True
+  torch_fft: False
+
+kernel:
+  npy_path: ${basic_path}/kernels/np
+  opt_kernel: ${kernel.npy_path}/optKernel.npy
+  opt_kernel_scale: ${kernel.npy_path}/optKernel_scale.npy
+  combo_opt_kernel: ${kernel.npy_path}/comboOptKernel.npy
+  num_kernel_used: 24 # min: 1 max: 24

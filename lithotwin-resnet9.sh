@@ -1,0 +1,1 @@
+python3 train_lt.py --dataroot ./datasets/iccad13v1 --name iccad13v1_lithotwin_resnet --model litho_twin --n_epochs_decay 9 --gpu_ids 4 --batch_size 2 --pool_size 25

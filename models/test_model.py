@@ -1,6 +1,6 @@
 from .base_model import BaseModel
 from . import networks
-
+import os 
 
 class TestModel(BaseModel):
     """ This TesteModel can be used to generate CycleGAN results for only one direction.
@@ -24,7 +24,7 @@ class TestModel(BaseModel):
         """
         assert not is_train, 'TestModel cannot be used during training time'
         parser.set_defaults(dataset_mode='single')
-        parser.add_argument('--model_suffix', type=str, default='', help='In checkpoints_dir, [epoch]_net_G[model_suffix].pth will be loaded as the generator.')
+        parser.add_argument('--model_suffix', type=str, default='_A', help='In checkpoints_dir, [epoch]_net_G[model_suffix].pth will be loaded as the generator.')
 
         return parser
 
@@ -36,6 +36,8 @@ class TestModel(BaseModel):
         """
         assert(not opt.isTrain)
         BaseModel.__init__(self, opt)
+        self.save_dir_pre = os.path.join(opt.checkpoints_dir, opt.name, "pretrain")
+        self.save_dir_post= os.path.join(opt.checkpoints_dir, opt.name, "postrain")
         # specify the training losses you want to print out. The training/test scripts  will call <BaseModel.get_current_losses>
         self.loss_names = []
         # specify the images you want to save/display. The training/test scripts  will call <BaseModel.get_current_visuals>

@@ -101,9 +101,9 @@ class BaseModel(ABC):
         This function wraps <forward> function in no_grad() so we don't save intermediate steps for backprop
         It also calls <compute_visuals> to produce additional visualization results
         """
-        with torch.no_grad():
-            self.forward()
-            self.compute_visuals()
+        #with torch.no_grad():
+        self.forward()
+        self.compute_visuals()
 
     def compute_visuals(self):
         """Calculate additional output images for visdom and HTML visualization"""
@@ -228,3 +228,9 @@ class BaseModel(ABC):
             if net is not None:
                 for param in net.parameters():
                     param.requires_grad = requires_grad
+
+    
+    def reset_learning_rate(self):
+        self.optimizers[0].param_groups[0]['lr'] = self.opt.lr
+        #for scheduler in self.schedulers:
+        #    scheduler.base_lrs=[self.opt.lr]

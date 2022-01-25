@@ -154,6 +154,12 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
         net = UnetGenerator(input_nc, output_nc, 7, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
     elif netG == 'unet_256':
         net = UnetGenerator(input_nc, output_nc, 8, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    elif netG == 'oinnlitho':
+        net = oinnlitho(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
+    elif netG == 'oinnopc':
+        net = oinnopc(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
+    elif netG == 'oinnopc_v001':
+        net = oinnopc_v001(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % netG)
     return init_net(net, init_type, init_gain, gpu_ids)
@@ -274,6 +280,54 @@ class GANLoss(nn.Module):
                 loss = prediction.mean()
         return loss
 
+
+
+class LpLoss(object):
+    def __init__(self, d=2, p=2, size_average=True, reduction=True):
+        super(LpLoss, self).__init__()
+
+        #Dimension and Lp-norm type are postive
+        assert d > 0 and p > 0
+
+        self.d = d
+        self.p = p
+        self.reduction = reduction
+        self.size_average = size_average
+
+    def abs(self, x, y):
+        num_examples = x.size()[0]
+
+        #Assume uniform mesh
+        h = 1.0 / (x.size()[1] - 1.0)
+
+        all_norms = (h**(self.d/self.p))*torch.norm(x.view(num_examples,-1) - y.view(num_examples,-1), self.p, 1)
+
+        if self.reduction:
+            if self.size_average:
+                return torch.mean(all_norms)
+            else:
+                return torch.sum(all_norms)
+
+        return all_norms
+
+    def rel(self, x, y):
+        num_examples = x.size()[0]
+
+        diff_norms = torch.norm(x.reshape(num_examples,-1) - y.reshape(num_examples,-1), self.p, 1)
+        y_norms = torch.norm(y.reshape(num_examples,-1), self.p, 1)
+        pseudo_y_norms = torch.ones(num_examples).type('torch.cuda.FloatTensor') *250000.0
+        y_norms = torch.where(y_norms==0,pseudo_y_norms,y_norms)
+
+        if self.reduction:
+            if self.size_average:
+                return torch.mean(diff_norms/y_norms)
+            else:
+                return torch.sum(diff_norms/y_norms)
+
+        return diff_norms/y_norms
+
+    def __call__(self, x, y):
+        return self.rel(x, y)
 
 def cal_gradient_penalty(netD, real_data, fake_data, device, type='mixed', constant=1.0, lambda_gp=10.0):
     """Calculate the gradient penalty loss, used in WGAN-GP paper https://arxiv.org/abs/1704.00028
@@ -613,3 +667,396 @@ class PixelDiscriminator(nn.Module):
     def forward(self, input):
         """Standard forward."""
         return self.net(input)
+
+
+################################################################
+# fourier layer
+################################################################
+class SpectralConv2d(nn.Module):
+    def __init__(self, in_channels, out_channels, modes1, modes2):
+        super(SpectralConv2d, self).__init__()
+
+        """
+        2D Fourier layer. It does FFT, linear transform, and Inverse FFT.    
+        """
+
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.modes1 = modes1 #Number of Fourier modes to multiply, at most floor(N/2) + 1
+        self.modes2 = modes2
+
+        self.scale = (1 / (in_channels * out_channels))
+        self.weights1 = nn.Parameter(self.scale * torch.rand(in_channels, out_channels, self.modes1, self.modes2, dtype=torch.cfloat))
+        self.weights2 = nn.Parameter(self.scale * torch.rand(in_channels, out_channels, self.modes1, self.modes2, dtype=torch.cfloat))
+
+    # Complex multiplication
+    def compl_mul2d(self, input, weights):
+        # (batch, in_channel, x,y ), (in_channel, out_channel, x,y) -> (batch, out_channel, x,y)
+        return torch.einsum("bixy,ioxy->boxy", input, weights)
+
+    def forward(self, x):
+        batchsize = x.shape[0]
+        #Compute Fourier coeffcients up to factor of e^(- something constant)
+        x_ft = torch.fft.rfft2(x)
+
+        # Multiply relevant Fourier modes
+        out_ft = torch.zeros(batchsize, self.out_channels,  x.size(-2), x.size(-1)//2 + 1, dtype=torch.cfloat, device=x.device)
+        out_ft[:, :, :self.modes1, :self.modes2] = \
+            self.compl_mul2d(x_ft[:, :, :self.modes1, :self.modes2], self.weights1)
+        out_ft[:, :, -self.modes1:, :self.modes2] = \
+            self.compl_mul2d(x_ft[:, :, -self.modes1:, :self.modes2], self.weights2)
+
+        #Return to physical space
+        x = torch.fft.irfft2(out_ft, s=(x.size(-2), x.size(-1)))
+        return x
+
+
+
+
+
+################################################################
+# fourier layer, lift input channel after fft
+################################################################
+class SpectralConv2dLiftChannel(nn.Module):
+    def __init__(self, in_channel, width, out_channels, modes1, modes2):
+        super(SpectralConv2dLiftChannel, self).__init__()
+
+        """
+        2D Fourier layer. It does FFT, linear transform, and Inverse FFT.    
+        lift in_channel to width after fft
+        """
+
+        self.in_channel = in_channel
+        self.width = width 
+        self.out_channels = out_channels
+        self.modes1 = modes1 #Number of Fourier modes to multiply, at most floor(N/2) + 1
+        self.modes2 = modes2
+
+        self.scale = (1 / (self.width * out_channels))
+        self.weights1 = nn.Parameter(self.scale * torch.rand(self.width, out_channels, self.modes1, self.modes2, dtype=torch.cfloat))
+        self.weights2 = nn.Parameter(self.scale * torch.rand(self.width, out_channels, self.modes1, self.modes2, dtype=torch.cfloat))
+        self.liftchannel = nn.Linear(self.in_channel, width, dtype=torch.cfloat)
+
+    # Complex multiplication
+    def compl_mul2d(self, input, weights):
+        # (batch, in_channel, x,y ), (in_channel, out_channel, x,y) -> (batch, out_channel, x,y)
+        return torch.einsum("bixy,ioxy->boxy", input, weights)
+
+    def forward(self, x):
+        batchsize = x.shape[0]
+        #Compute Fourier coeffcients up to factor of e^(- something constant)
+        x_ft = torch.fft.rfft2(x).permute(0, 2, 3, 1) #N H W C
+
+        x_lift = self.liftchannel(x_ft).permute(0, 3, 1, 2) #N C H W
+
+        # Multiply relevant Fourier modes
+        out_ft = torch.zeros(batchsize, self.out_channels,  x.size(-2), x.size(-1)//2 + 1, dtype=torch.cfloat, device=x.device)
+        out_ft[:, :, :self.modes1, :self.modes2] = \
+            self.compl_mul2d(x_lift[:, :, :self.modes1, :self.modes2], self.weights1)
+        out_ft[:, :, -self.modes1:, :self.modes2] = \
+            self.compl_mul2d(x_lift[:, :, -self.modes1:, :self.modes2], self.weights2)
+
+        #Return to physical space
+        x = torch.fft.irfft2(out_ft, s=(x.size(-2), x.size(-1)))
+        return x
+
+
+
+
+class VGGBlock(nn.Module):
+    def __init__(self, channels, act_func=nn.LeakyReLU(0.2, inplace=True)):
+        super(VGGBlock, self).__init__()
+        self.act_func_down = act_func
+        self.act_func_up = nn.ReLU(True)
+        # self.act_func_up = act_func
+        self.conv1 = nn.Conv2d(channels, channels, 3, padding=1)
+        self.bn1 = nn.BatchNorm2d(channels)
+        self.conv2 = nn.Conv2d(channels, channels, 3, padding=1)
+        self.bn2 = nn.BatchNorm2d(channels)
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.act_func_down(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.act_func_up(out)
+
+        return out
+class PoolConv(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        """
+        :params:
+            channels-- input and out channels
+        """
+        super().__init__()
+        self.pool_conv = nn.Conv2d(in_channels, out_channels, kernel_size=4,
+                        stride=2, padding=1, bias=False
+        )
+    def forward(self, input):
+        return self.pool_conv(input)
+
+class UpConv(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.up_conv = nn.ConvTranspose2d(in_channels, out_channels,
+                                    kernel_size=4, stride=2,
+                                    padding=1, bias=False)
+
+    def forward(self, input):
+        return self.up_conv(input)
+
+
+
+class oinnopc(nn.Module): 
+    def __init__(self, modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3):
+        super(oinnopc, self).__init__()
+
+        # from design to mask, same as forward v2 as baseline.
+
+        self.modes1 = modes1
+        self.modes2 = modes2
+        self.width = width
+        self.refine_kernel = refine_kernel
+        self.in_channel = in_channel
+        self.refine_channel = refine_channel
+        self.smooth_kernel = smooth_kernel
+        #self.cemap = cemap
+        self.vgg_channels = [4,8,16,16,8,4]
+
+        #resize
+        self.resize0 = nn.AvgPool2d(8)
+        #fourier
+        self.fno = SpectralConv2dLiftChannel(self.in_channel, self.width, self.width, self.modes1, self.modes2)
+
+        #refine
+        self.convr0 = nn.Conv2d(in_channels=self.vgg_channels[5], out_channels=self.refine_channel, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr1 = nn.Conv2d(in_channels=self.refine_channel, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr2 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+
+        self.convr3 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=1, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.act_fn = nn.LeakyReLU(0.1)
+
+        #bypass unet
+        self.ds0 = PoolConv(1, self.vgg_channels[0])
+        self.vgg0 = VGGBlock(self.vgg_channels[0])
+        self.ds1 = PoolConv(self.vgg_channels[0], self.vgg_channels[1])
+        self.vgg1 = VGGBlock(self.vgg_channels[1])
+        self.ds2 = PoolConv(self.vgg_channels[1], self.vgg_channels[2])
+        self.vgg2 = VGGBlock(self.vgg_channels[2])   #250
+        self.us3 = UpConv(self.vgg_channels[2]+self.width, self.vgg_channels[3]) #merge with fno output
+        self.vgg3 = VGGBlock(self.vgg_channels[3])
+        self.us4 = UpConv(self.vgg_channels[3]+self.vgg_channels[1], self.vgg_channels[4])
+        self.vgg4 = VGGBlock(self.vgg_channels[4])
+        self.us5 = UpConv(self.vgg_channels[4]+self.vgg_channels[0], self.vgg_channels[5])
+        self.vgg5 = VGGBlock(self.vgg_channels[5])
+
+
+        self.tanh = nn.Tanh()
+        
+
+
+    def forward(self, x):
+
+        #fno pass
+        x_fno = self.resize0(x) 
+        x_fno = self.fno(x_fno)       
+        x_fno = self.act_fn(x_fno) 
+        #unet pass
+        x_unet = self.ds0(x)
+        x_unet_1000 = self.vgg0(x_unet)
+        x_unet = self.ds1(x_unet_1000)
+        x_unet_500 = self.vgg1(x_unet)
+        x_unet = self.ds2(x_unet_500)
+        x_unet_250 = self.vgg2(x_unet)
+
+        #merge fno and unet
+        x = torch.cat((x_fno, x_unet_250), 1)
+
+        #dconv
+        x = self.us3(x)
+        x = torch.cat((self.vgg3(x),x_unet_500), 1)
+        x = self.us4(x)
+        x = torch.cat((self.vgg4(x),x_unet_1000), 1)
+        x = self.us5(x)
+        x = self.vgg5(x)
+        #refine
+        x = self.convr0(x)
+        x = self.act_fn(x)
+        x = self.convr1(x)
+        x = self.act_fn(x)
+        x = self.convr2(x)
+        x = self.act_fn(x)
+        x = self.convr3(x)
+
+
+        return self.tanh(x)
+
+class oinnopc_v001(nn.Module): 
+    def __init__(self, modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3):
+        super(oinnopc_v001, self).__init__()
+
+        # from design to mask, same as forward v2 as baseline. change output to sigmoid
+
+        self.modes1 = modes1
+        self.modes2 = modes2
+        self.width = width
+        self.refine_kernel = refine_kernel
+        self.in_channel = in_channel
+        self.refine_channel = refine_channel
+        self.smooth_kernel = smooth_kernel
+        #self.cemap = cemap
+        self.vgg_channels = [4,8,16,16,8,4]
+
+        #resize
+        self.resize0 = nn.AvgPool2d(8)
+        #fourier
+        self.fno = SpectralConv2dLiftChannel(self.in_channel, self.width, self.width, self.modes1, self.modes2)
+
+        #refine
+        self.convr0 = nn.Conv2d(in_channels=self.vgg_channels[5], out_channels=self.refine_channel, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr1 = nn.Conv2d(in_channels=self.refine_channel, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr2 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+
+        self.convr3 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=1, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.act_fn = nn.LeakyReLU(0.1)
+
+        #bypass unet
+        self.ds0 = PoolConv(1, self.vgg_channels[0])
+        self.vgg0 = VGGBlock(self.vgg_channels[0])
+        self.ds1 = PoolConv(self.vgg_channels[0], self.vgg_channels[1])
+        self.vgg1 = VGGBlock(self.vgg_channels[1])
+        self.ds2 = PoolConv(self.vgg_channels[1], self.vgg_channels[2])
+        self.vgg2 = VGGBlock(self.vgg_channels[2])   #250
+        self.us3 = UpConv(self.vgg_channels[2]+self.width, self.vgg_channels[3]) #merge with fno output
+        self.vgg3 = VGGBlock(self.vgg_channels[3])
+        self.us4 = UpConv(self.vgg_channels[3]+self.vgg_channels[1], self.vgg_channels[4])
+        self.vgg4 = VGGBlock(self.vgg_channels[4])
+        self.us5 = UpConv(self.vgg_channels[4]+self.vgg_channels[0], self.vgg_channels[5])
+        self.vgg5 = VGGBlock(self.vgg_channels[5])
+
+
+        self.final = nn.Sigmoid()
+        
+
+
+    def forward(self, x):
+
+        #fno pass
+        x_fno = self.resize0(x) 
+        x_fno = self.fno(x_fno)       
+        x_fno = self.act_fn(x_fno) 
+        #unet pass
+        x_unet = self.ds0(x)
+        x_unet_1000 = self.vgg0(x_unet)
+        x_unet = self.ds1(x_unet_1000)
+        x_unet_500 = self.vgg1(x_unet)
+        x_unet = self.ds2(x_unet_500)
+        x_unet_250 = self.vgg2(x_unet)
+
+        #merge fno and unet
+        x = torch.cat((x_fno, x_unet_250), 1)
+
+        #dconv
+        x = self.us3(x)
+        x = torch.cat((self.vgg3(x),x_unet_500), 1)
+        x = self.us4(x)
+        x = torch.cat((self.vgg4(x),x_unet_1000), 1)
+        x = self.us5(x)
+        x = self.vgg5(x)
+        #refine
+        x = self.convr0(x)
+        x = self.act_fn(x)
+        x = self.convr1(x)
+        x = self.act_fn(x)
+        x = self.convr2(x)
+        x = self.act_fn(x)
+        x = self.convr3(x)
+
+
+        return self.final(x)
+
+class oinnlitho(nn.Module): 
+    def __init__(self, modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3):
+        super(oinnlitho, self).__init__()
+
+        # from design to mask, same as forward v2 as baseline.
+
+        self.modes1 = modes1
+        self.modes2 = modes2
+        self.width = width
+        self.refine_kernel = refine_kernel
+        self.in_channel = in_channel
+        self.refine_channel = refine_channel
+        self.smooth_kernel = smooth_kernel
+        #self.cemap = cemap
+        self.vgg_channels = [4,8,16,16,8,4]
+
+        #resize
+        self.resize0 = nn.AvgPool2d(8)
+        #fourier
+        self.fno = SpectralConv2dLiftChannel(self.in_channel, self.width, self.width, self.modes1, self.modes2)
+
+        #refine
+        self.convr0 = nn.Conv2d(in_channels=self.vgg_channels[5], out_channels=self.refine_channel, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr1 = nn.Conv2d(in_channels=self.refine_channel, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr2 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+
+        self.convr3 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=1, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.act_fn = nn.LeakyReLU(0.1)
+
+        #bypass unet
+        self.ds0 = PoolConv(1, self.vgg_channels[0])
+        self.vgg0 = VGGBlock(self.vgg_channels[0])
+        self.ds1 = PoolConv(self.vgg_channels[0], self.vgg_channels[1])
+        self.vgg1 = VGGBlock(self.vgg_channels[1])
+        self.ds2 = PoolConv(self.vgg_channels[1], self.vgg_channels[2])
+        self.vgg2 = VGGBlock(self.vgg_channels[2])   #250
+        self.us3 = UpConv(self.vgg_channels[2]+self.width, self.vgg_channels[3]) #merge with fno output
+        self.vgg3 = VGGBlock(self.vgg_channels[3])
+        self.us4 = UpConv(self.vgg_channels[3]+self.vgg_channels[1], self.vgg_channels[4])
+        self.vgg4 = VGGBlock(self.vgg_channels[4])
+        self.us5 = UpConv(self.vgg_channels[4]+self.vgg_channels[0], self.vgg_channels[5])
+        self.vgg5 = VGGBlock(self.vgg_channels[5])
+
+
+        self.tanh = nn.Tanh()
+
+
+    def forward(self, x):
+
+        #fno pass
+        x_fno = self.resize0(x) 
+        x_fno = self.fno(x_fno)       
+        x_fno = self.act_fn(x_fno) 
+        #unet pass
+        x_unet = self.ds0(x)
+        x_unet_1000 = self.vgg0(x_unet)
+        x_unet = self.ds1(x_unet_1000)
+        x_unet_500 = self.vgg1(x_unet)
+        x_unet = self.ds2(x_unet_500)
+        x_unet_250 = self.vgg2(x_unet)
+
+        #merge fno and unet
+        x = torch.cat((x_fno, x_unet_250), 1)
+
+        #dconv
+        x = self.us3(x)
+        x = torch.cat((self.vgg3(x),x_unet_500), 1)
+        x = self.us4(x)
+        x = torch.cat((self.vgg4(x),x_unet_1000), 1)
+        x = self.us5(x)
+        x = self.vgg5(x)
+        #refine
+        x = self.convr0(x)
+        x = self.act_fn(x)
+        x = self.convr1(x)
+        x = self.act_fn(x)
+        x = self.convr2(x)
+        x = self.act_fn(x)
+        x = self.convr3(x)
+
+
+        return self.tanh(x)
+

@@ -1,0 +1,5 @@
+# @package _group_
+basic_path: /research/d2/xfyao/guojin/data/datasets/develset_ganopc_train/train_7
+targets_path: ${dataset.basic_path}/targets
+lsparams_path: ${dataset.basic_path}/ls_params
+batch_size: 1

@@ -1,0 +1,45 @@
+exp_name: l11ganopc
+
+defaults:
+  - dataset: l11ganopc_data0
+
+hydra:
+  run:
+    dir: ${exp_name}_outputs
+
+basic_path: /research/d2/xfyao/guojin/develset_opc/levelset_net
+
+
+trainer:
+  gpus: 1
+  max_epochs: 30
+
+logger:
+  refresh: True # delete old logs
+  save_path: tb_loggers
+  log_metrics: True
+
+view:
+  save_img: False
+  save_img_last_epochs: 1
+  save_loss : False # save loss to tensorboard
+
+model:
+  loss_weights:
+    ilt_weight: 1
+    pvb_weight: 7
+  ilt_exp: 4 # the loss for ilt exponent (target - nominal)^(ilt_exp), must be int
+  ckpt:
+    save_time: ${now:%Y-%m-%d_%H-%M-%S}
+    save_path: ckpts_${model.ckpt.save_time}
+    # save_path: ckpts_2021-04-09_20-02-35
+  add_curv: True
+  curv_weight: 1
+  torch_fft: False
+
+kernel:
+  npy_path: ${basic_path}/kernels/np
+  opt_kernel: ${kernel.npy_path}/optKernel.npy
+  opt_kernel_scale: ${kernel.npy_path}/optKernel_scale.npy
+  combo_opt_kernel: ${kernel.npy_path}/comboOptKernel.npy
+  num_kernel_used: 8 # min: 1 max: 24

@@ -1,0 +1,6 @@
+# @package _group_
+# basic_path: /home/guojin/projects/develset_opc/levelset_dnn/results/unet_320/2021-04-13/20-24-10/pred_data
+basic_path: /home/guojin/projects/develset_opc/levelset_dnn/results/unet_320/2021-04-13/21-48-26/pred_data
+targets_path: ${dataset.basic_path}/targets
+lsparams_path: ${dataset.basic_path}/ls_params
+batch_size: 1

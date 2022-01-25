@@ -1,0 +1,12 @@
+cupy
+gym
+hydra-core
+numpy
+omegaconf
+Pillow
+pytorch-lightning==1.1.1
+pytorch-lightning-bolts @ git+https://github.com/PytorchLightning/pytorch-lightning-bolts.git@9503df5c132541ded58da1f477062e313b711d56
+PyYAML
+scipy
+tensorboard
+torch==1.7.0

@@ -1,0 +1,11 @@
+basic_path: ${hydra:runtime.cwd}
+target_path: /home/guojin/projects/cu-ilt-litho/build/targetImg.png
+mask_path: /home/guojin/projects/cu-ilt-litho/build/MaskB0.png
+kernel:
+  npy_path: ${basic_path}/kernels/np
+  opt_kernel: ${kernel.npy_path}/optKernel.npy
+  opt_kernel_scale: ${kernel.npy_path}/optKernel_scale.npy
+  combo_opt_kernel: ${kernel.npy_path}/comboOptKernel.npy
+  num_kernel_used:
+    opt_used: 15
+    combo_used: 9

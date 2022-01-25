@@ -1,0 +1,41 @@
+exp_name: iccad13_torch
+
+defaults:
+  - dataset: iccad13_data
+
+hydra:
+  run:
+    dir: ${exp_name}_outputs
+
+basic_path: /home/guojin/projects/develset_opc/levelset_net
+
+trainer:
+  gpus: 1
+  max_epochs: 30
+
+logger:
+  refresh: True # delete old logs
+  save_path: tb_loggers
+  log_metrics: True
+
+view:
+  save_img: True
+  save_img_last_epochs: 1
+  save_loss : True
+
+model:
+  loss_weights:
+    ilt_weight: 1
+    pvb_weight: 7.5
+  ckpt:
+    save_time: ${now:%Y-%m-%d_%H-%M-%S}
+    save_path: ckpts_${model.ckpt.save_time}
+  add_curv: False # add curveture term
+  torch_fft: True # use the torch original fft?
+
+kernel:
+  npy_path: ${basic_path}/kernels/torch
+  opt_kernel: ${kernel.npy_path}/optKernel.pt
+  opt_kernel_scale: ${kernel.npy_path}/optKernel_scale.pt
+  combo_opt_kernel: ${kernel.npy_path}/comboOptKernel.pt
+  num_kernel_used: 24 # min: 1 max: 24
