@@ -160,6 +160,8 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
         net = oinnopc(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
     elif netG == 'oinnopc_v001':
         net = oinnopc_v001(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
+    elif netG == 'oinnopc_large':
+        net = oinnopc_large(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % netG)
     return init_net(net, init_type, init_gain, gpu_ids)
@@ -745,10 +747,11 @@ class SpectralConv2dLiftChannel(nn.Module):
     def forward(self, x):
         batchsize = x.shape[0]
         #Compute Fourier coeffcients up to factor of e^(- something constant)
+        print(x.shape)
         x_ft = torch.fft.rfft2(x).permute(0, 2, 3, 1) #N H W C
-
-        x_lift = self.liftchannel(x_ft).permute(0, 3, 1, 2) #N C H W
-
+        print(x_ft.shape)
+        x_lift = self.liftchannel(x_ft)#.permute(0, 3, 1, 2) #N C H W
+        print(x_lift.shape)
         # Multiply relevant Fourier modes
         out_ft = torch.zeros(batchsize, self.out_channels,  x.size(-2), x.size(-1)//2 + 1, dtype=torch.cfloat, device=x.device)
         out_ft[:, :, :self.modes1, :self.modes2] = \
@@ -807,7 +810,174 @@ class UpConv(nn.Module):
     def forward(self, input):
         return self.up_conv(input)
 
+## DAMO baseline
 
+class PoolConv2(nn.Module):
+    def __init__(self, channels):
+        """
+        :params:
+            channels-- input and out channels
+        """
+        super().__init__()
+        self.pool_conv = nn.Conv2d(channels, channels, kernel_size=4,
+                        stride=2, padding=1, bias=False
+        )
+    def forward(self, input):
+        return self.pool_conv(input)
+
+class UpConv2(nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        self.up_conv = nn.ConvTranspose2d(channels, channels,
+                                    kernel_size=4, stride=2,
+                                    padding=1, bias=False)
+
+    def forward(self, input):
+        return self.up_conv(input)
+
+class VGGBlock2(nn.Module):
+    def __init__(self, in_channels, middle_channels, out_channels, act_func=nn.LeakyReLU(0.2, inplace=True)):
+        super(VGGBlock2, self).__init__()
+        self.act_func_down = act_func
+        self.act_func_up = nn.ReLU(True)
+        # self.act_func_up = act_func
+        self.conv1 = nn.Conv2d(in_channels, middle_channels, 3, padding=1)
+        self.bn1 = nn.BatchNorm2d(middle_channels)
+        self.conv2 = nn.Conv2d(middle_channels, out_channels, 3, padding=1)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.act_func_down(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.act_func_up(out)
+
+        return out
+        
+class NestedUNet(nn.Module):
+    def __init__(self, input_nc, output_nc=1, lambda_o=1, tanh_act=True, deepsupervision=True, upp_scale=2):
+        """
+        :param args:
+            input_channels
+            deepsupervison
+        """
+        super(NestedUNet, self).__init__()
+
+        self.input_nc = input_nc
+        self.output_nc = output_nc
+        self.deepsupervision = deepsupervision
+        self.tanh_act = tanh_act
+        self.lambda_o = lambda_o
+
+        nb_filter = [64, 128, 256, 512, 1024]
+        nb_filter = [int(x / upp_scale) for x in nb_filter]
+        self.nb_filter = nb_filter
+        """
+        change the pooling layer to conv2d stride
+        using func self.pool
+        """
+        # self.pool = nn.MaxPool2d(2, 2)
+        # self.pool = nn.Conv2d()
+
+        """
+        change the upsampleing layer to conv2dtransposed stride
+        using func self.up
+        """
+        # self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+
+        self.conv0_0 = VGGBlock2(self.input_nc, nb_filter[0], nb_filter[0])
+        self.pool0_0 = PoolConv2(nb_filter[0])
+        self.conv1_0 = VGGBlock2(nb_filter[0], nb_filter[1], nb_filter[1])
+        self.pool1_0 = PoolConv2(nb_filter[1])
+        self.up1_0 = UpConv2(nb_filter[1])
+        self.conv2_0 = VGGBlock2(nb_filter[1], nb_filter[2], nb_filter[2])
+        self.pool2_0 = PoolConv2(nb_filter[2])
+        self.up2_0 = UpConv2(nb_filter[2])
+        self.conv3_0 = VGGBlock2(nb_filter[2], nb_filter[3], nb_filter[3])
+        self.pool3_0 = PoolConv2(nb_filter[3])
+        self.up3_0 = UpConv2(nb_filter[3])
+        self.conv4_0 = VGGBlock2(nb_filter[3], nb_filter[4], nb_filter[4])
+        self.up4_0 = UpConv2(nb_filter[4])
+
+
+        self.conv0_1 = VGGBlock2(nb_filter[0]+nb_filter[1], nb_filter[0], nb_filter[0])
+        self.conv1_1 = VGGBlock2(nb_filter[1]+nb_filter[2], nb_filter[1], nb_filter[1])
+        self.up1_1 = UpConv2(nb_filter[1])
+        self.conv2_1 = VGGBlock2(nb_filter[2]+nb_filter[3], nb_filter[2], nb_filter[2])
+        self.up2_1 = UpConv2(nb_filter[2])
+        self.conv3_1 = VGGBlock2(nb_filter[3]+nb_filter[4], nb_filter[3], nb_filter[3])
+        self.up3_1 = UpConv2(nb_filter[3])
+
+        self.conv0_2 = VGGBlock2(nb_filter[0]*2+nb_filter[1], nb_filter[0], nb_filter[0])
+        self.conv1_2 = VGGBlock2(nb_filter[1]*2+nb_filter[2], nb_filter[1], nb_filter[1])
+        self.up1_2 = UpConv2(nb_filter[1])
+        self.conv2_2 = VGGBlock2(nb_filter[2]*2+nb_filter[3], nb_filter[2], nb_filter[2])
+        self.up2_2 = UpConv2(nb_filter[2])
+
+        self.conv0_3 = VGGBlock2(nb_filter[0]*3+nb_filter[1], nb_filter[0], nb_filter[0])
+        self.conv1_3 = VGGBlock2(nb_filter[1]*3+nb_filter[2], nb_filter[1], nb_filter[1])
+        self.up1_3 = UpConv2(nb_filter[1])
+
+        self.conv0_4 = VGGBlock2(nb_filter[0]*4+nb_filter[1], nb_filter[0], nb_filter[0])
+
+        if self.deepsupervision:
+            self.final1 = nn.Conv2d(nb_filter[0], self.output_nc, kernel_size=1)
+            self.final2 = nn.Conv2d(nb_filter[0], self.output_nc, kernel_size=1)
+            self.final3 = nn.Conv2d(nb_filter[0], self.output_nc, kernel_size=1)
+            self.final4 = nn.Conv2d(nb_filter[0], self.output_nc, kernel_size=1)
+        else:
+            self.final = nn.Conv2d(nb_filter[0], self.output_nc, kernel_size=1)
+
+        if self.tanh_act:
+            self.tanh = nn.Tanh()
+
+    def forward(self, input):
+        nb_filter = self.nb_filter
+        input = nn.ConstantPad2d((12,12,12,12),0)(input)
+        x0_0 = self.conv0_0(input)
+        x1_0 = self.conv1_0(self.pool0_0(x0_0))
+        x0_1 = self.conv0_1(torch.cat([x0_0, self.up1_0(x1_0)], 1))
+
+        x2_0 = self.conv2_0(self.pool1_0(x1_0))
+        x1_1 = self.conv1_1(torch.cat([x1_0, self.up2_0(x2_0)], 1))
+        x0_2 = self.conv0_2(torch.cat([x0_0, x0_1, self.up1_1(x1_1)], 1))
+
+        x3_0 = self.conv3_0(self.pool2_0(x2_0))
+        x2_1 = self.conv2_1(torch.cat([x2_0, self.up3_0(x3_0)], 1))
+        x1_2 = self.conv1_2(torch.cat([x1_0, x1_1, self.up2_1(x2_1)], 1))
+        x0_3 = self.conv0_3(torch.cat([x0_0, x0_1, x0_2, self.up1_2(x1_2)], 1))
+
+        x4_0 = self.conv4_0(self.pool3_0(x3_0))
+        x3_1 = self.conv3_1(torch.cat([x3_0, self.up4_0(x4_0)], 1))
+        x2_2 = self.conv2_2(torch.cat([x2_0, x2_1, self.up3_1(x3_1)], 1))
+        x1_3 = self.conv1_3(torch.cat([x1_0, x1_1, x1_2, self.up2_2(x2_2)], 1))
+        x0_4 = self.conv0_4(torch.cat([x0_0, x0_1, x0_2, x0_3, self.up1_3(x1_3)], 1))
+
+        if self.deepsupervision:
+            output1 = self.final1(x0_1)
+            output2 = self.final2(x0_2)
+            output3 = self.final3(x0_3)
+            output4 = self.final4(x0_4)
+            output = (output1 + output2 + output3 + output4)/4
+            output = output * self.lambda_o
+            if self.tanh_act:
+                return self.tanh(output)[:,:,12:-12,12:-12]
+            else:
+                return ((output1 + output2 + output3 + output4)/4)[:,:,12:-12,12:-12]
+            # return [output1, output2, output3, output4]
+
+        else:
+            if self.tanh_act:
+                output = self.final(x0_4)
+                output = output * self.lambda_o
+                output = self.tanh(output)[:,:,12:-12,12:-12]
+            else:
+                output = self.final(x0_4)
+                output = output * self.lambda_o
+            return output[:,:,12:-12,12:-12]
 
 class oinnopc(nn.Module): 
     def __init__(self, modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3):
@@ -861,6 +1031,7 @@ class oinnopc(nn.Module):
 
         #fno pass
         x_fno = self.resize0(x) 
+        print(x_fno.shape)
         x_fno = self.fno(x_fno)       
         x_fno = self.act_fn(x_fno) 
         #unet pass
@@ -945,6 +1116,7 @@ class oinnopc_v001(nn.Module):
 
         #fno pass
         x_fno = self.resize0(x) 
+
         x_fno = self.fno(x_fno)       
         x_fno = self.act_fn(x_fno) 
         #unet pass
@@ -1059,4 +1231,120 @@ class oinnlitho(nn.Module):
 
 
         return self.tanh(x)
+
+
+
+
+
+class oinnopc_large(nn.Module): #one fno unit only
+    def __init__(self, modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3):
+        super(oinnopc_large, self).__init__()
+
+        '''Support larger 8kX8k tile input'''
+
+        self.modes1 = modes1
+        self.modes2 = modes2
+        self.width = width
+        self.refine_kernel = refine_kernel
+        self.in_channel = in_channel
+        self.refine_channel = refine_channel
+        self.smooth_kernel = smooth_kernel
+        #self.cemap = cemap
+        self.vgg_channels = [4,8,16,16,8,4]
+
+        #resize
+        self.resize0 = nn.AvgPool2d(8)
+        #fourier
+        self.fno = SpectralConv2dLiftChannel(self.in_channel, self.width, self.width, self.modes1, self.modes2)
+
+        #refine
+        self.convr0 = nn.Conv2d(in_channels=self.vgg_channels[5], out_channels=self.refine_channel, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr1 = nn.Conv2d(in_channels=self.refine_channel, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr2 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+
+        self.convr3 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=1, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.act_fn = nn.LeakyReLU(0.1)
+
+        #bypass unet
+        self.ds0 = PoolConv(1, self.vgg_channels[0])
+        self.vgg0 = VGGBlock(self.vgg_channels[0])
+        self.ds1 = PoolConv(self.vgg_channels[0], self.vgg_channels[1])
+        self.vgg1 = VGGBlock(self.vgg_channels[1])
+        self.ds2 = PoolConv(self.vgg_channels[1], self.vgg_channels[2])
+        self.vgg2 = VGGBlock(self.vgg_channels[2])   #250
+        self.us3 = UpConv(self.vgg_channels[2]+self.width, self.vgg_channels[3]) #merge with fno output
+        self.vgg3 = VGGBlock(self.vgg_channels[3])
+        self.us4 = UpConv(self.vgg_channels[3]+self.vgg_channels[1], self.vgg_channels[4])
+        self.vgg4 = VGGBlock(self.vgg_channels[4])
+        self.us5 = UpConv(self.vgg_channels[4]+self.vgg_channels[0], self.vgg_channels[5])
+        self.vgg5 = VGGBlock(self.vgg_channels[5])
+
+        #S-G smoothing
+        #self.conv_smooth = nn.Conv2d(in_channels=1,out_channels=1,kernel_size=self.smooth_kernel, padding = (self.smooth_kernel-1)//2, bias=False) 
+        #self.conv_smooth.weight = nn.Parameter(torch.tensor(data=np.expand_dims(np.expand_dims(sg.get_2D_filter(self.smooth_kernel,1,0),0),0), dtype=torch.float), requires_grad=False)
+        ##self.bn0 = nn.BatchNorm2d(self.refine_channel)
+        ##self.bn1 = nn.BatchNorm2d(self.refine_channel//2)
+        ##self.bn2 = nn.BatchNorm2d(self.refine_channel//2)
+        ##self.bn1 = nn.BatchNorm2d(self.refine_channel)
+        ##self.fc1 = nn.Linear(self.width, 128)
+        ##self.fc2 = nn.Linear(128, 1)
+        self.tanh = nn.Tanh()
+
+
+        #attentions
+        #self.attention0 = attention_block(self.refine_channel)
+        #self.attention1 = spatial_attention(self.refine_channel//2)
+        #self.attention2 = spatial_attention(self.refine_channel//2)
+    def forward(self, x):
+
+        #fno pass
+
+
+        x_fno = self.resize0(x) 
+        #print(x_fno.shape)
+        #fno_size = x_fno.shape[-1]
+        x_fnos=torch.zeros_like(x_fno).cuda().repeat(1, self.vgg_channels[2], 1, 1)
+
+        for i in range(7):
+            for j in range(7):
+                tmpfno = self.fno(x_fno[:,:,i*128:i*128+256, j*128:j*128+256])
+                tmpfno = self.act_fn(tmpfno)
+                #print(tmpfno.shape)
+                x_fnos[:,:,i*128+64:i*128+192,j*128+64:j*128+192] = tmpfno[:,:,64:192,64:192]
+
+        #x_fno = self.fno(x_fno)       
+        #x_fno = self.act_fn(x_fno) 
+        #unet pass
+        x_unet = self.ds0(x)
+        x_unet_1000 = self.vgg0(x_unet)
+        x_unet = self.ds1(x_unet_1000)
+        x_unet_500 = self.vgg1(x_unet)
+        x_unet = self.ds2(x_unet_500)
+        x_unet_250 = self.vgg2(x_unet)
+        #print(x_unet_250.shape)
+        #merge fno and unet
+        x = torch.cat((x_fnos, x_unet_250), 1)
+        #print(x.shape)
+        #dconv
+        x = self.us3(x)
+        x = torch.cat((self.vgg3(x),x_unet_500), 1)
+        x = self.us4(x)
+        x = torch.cat((self.vgg4(x),x_unet_1000), 1)
+        x = self.us5(x)
+        x = self.vgg5(x)
+        #refine
+        x = self.convr0(x)
+        x = self.act_fn(x)
+        #x = self.attention0(x)
+        x = self.convr1(x)
+        x = self.act_fn(x)
+        #x = self.attention1(x)
+        x = self.convr2(x)
+        x = self.act_fn(x)
+        #x = self.attention2(x)
+        x = self.convr3(x)
+        #x = self.conv_smooth(x)
+
+        return self.tanh(x)
+
 

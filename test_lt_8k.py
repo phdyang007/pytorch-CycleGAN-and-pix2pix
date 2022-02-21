@@ -33,7 +33,7 @@ from models import create_model
 from util.visualizer import save_images
 from util import html
 from datetime import datetime
-
+import torch
 try:
     import wandb
 except ImportError:
@@ -83,29 +83,30 @@ if __name__ == '__main__':
     designs = []
     result = np.zeros((datanum, 4)).astype(float)
     
-    
+
     name=    open(os.path.join(opt.results_dir, opt.name, "name.txt"), 'w')
-    for i, data in enumerate(dataset):
-        #if i >= opt.num_test:  # only apply our model to opt.num_test images.
-        #    break
-        model.set_input(data)  # unpack data from data loader
-        start = timeit.default_timer()
-        model.test()           # run inference
-        end = timeit.default_timer()
-        visuals = model.get_current_visuals()  # get image results
-        img_path = model.get_image_paths()     # get image paths
-        #if i % 5 == 0:  # save images to an HTML file
-        print('processing (%04d)-th image... %s, runtime: %f' % (i, img_path[0], end-start))
+    with torch.no_grad():
+        for i, data in enumerate(dataset):
+            #if i >= opt.num_test:  # only apply our model to opt.num_test images.
+            #    break
+            model.set_input(data)  # unpack data from data loader
+            start = timeit.default_timer()
+            model.test()           # run inference
+            end = timeit.default_timer()
+            visuals = model.get_current_visuals()  # get image results
+            img_path = model.get_image_paths()     # get image paths
+            #if i % 5 == 0:  # save images to an HTML file
+            print('processing (%04d)-th image... %s, runtime: %f' % (i, img_path[0], end-start))
 
-        name.write(os.path.basename(img_path[0]))
-        name.write("\n")
-        result[i,0] = model.g_l2.cpu().detach().numpy()
-        result[i,1] = model.g_pvb.cpu().detach().numpy()
-        result[i,2] = model.l2.cpu().detach().numpy()
-        result[i,3] = model.pvb.cpu().detach().numpy()
+            name.write(os.path.basename(img_path[0]))
+            name.write("\n")
+            #result[i,0] = model.g_l2.cpu().detach().numpy()
+            #result[i,1] = model.g_pvb.cpu().detach().numpy()
+            #result[i,2] = model.l2.cpu().detach().numpy()
+            #result[i,3] = model.pvb.cpu().detach().numpy()
+#
 
-
-        save_images(webpage, visuals, img_path, aspect_ratio=opt.aspect_ratio, width=opt.display_winsize, use_wandb=opt.use_wandb)
-    webpage.save()  # save the HTML
+        #save_images(webpage, visuals, img_path, aspect_ratio=opt.aspect_ratio, width=opt.display_winsize, use_wandb=opt.use_wandb)
+    #webpage.save()  # save the HTML
     name.close()
-    np.savetxt(os.path.join(opt.results_dir, opt.name, "result.csv"), result, delimiter=',')
+    #np.savetxt(os.path.join(opt.results_dir, opt.name, "result.csv"), result, delimiter=',')

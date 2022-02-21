@@ -43,7 +43,7 @@ if __name__ == '__main__':
     visualizer.web_dir = os.path.join(opt.checkpoints_dir, opt.name, 'web_pretrain')
     visualizer.img_dir = os.path.join(visualizer.web_dir, 'images')
     mkdir(visualizer.img_dir)
-    for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):    # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
+    for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay_1 + 1):    # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
         epoch_start_time = time.time()  # timer for entire epoch
         iter_data_time = time.time()    # timer for data loading per iteration
         epoch_iter = 0                  # the number of training iterations in current epoch, reset to 0 every epoch
@@ -78,7 +78,7 @@ if __name__ == '__main__':
 #
             iter_data_time = time.time()
 #
-            #if i==15: break
+            #if i==1: break
 #
         if epoch % opt.save_epoch_freq == 0:              # cache our model every <save_epoch_freq> epochs
             print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
@@ -89,6 +89,7 @@ if __name__ == '__main__':
 #
 
     #do lithotwin
+    """
     print("Start LithoTwin\n")
     model.save_dir = model.save_dir_post
     visualizer.web_dir = os.path.join(opt.checkpoints_dir, opt.name, 'web_posttrain')
@@ -98,7 +99,7 @@ if __name__ == '__main__':
     #model.reset_learning_rate()
     model.setup(opt)               # regular setup: load and print networks; create schedulers
 
-    for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):    # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
+    for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay_2 + 1):    # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
         epoch_start_time = time.time()  # timer for entire epoch
         iter_data_time = time.time()    # timer for data loading per iteration
         epoch_iter = 0                  # the number of training iterations in current epoch, reset to 0 every epoch
@@ -140,3 +141,4 @@ if __name__ == '__main__':
             model.save_networks(epoch)
 
         print('End of epoch %d / %d \t Time Taken: %d sec' % (epoch, opt.n_epochs + opt.n_epochs_decay, time.time() - epoch_start_time))
+    """

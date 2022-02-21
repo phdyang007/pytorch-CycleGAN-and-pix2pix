@@ -37,7 +37,7 @@ def litho_trans(img_path):
     return im
 
 
-img_count = 10
+img_count = 100
 max_iter  = 24
 
 
@@ -45,18 +45,19 @@ l2=np.zeros((img_count,max_iter))
 pvb=np.zeros((img_count,max_iter))
 
 
-for i in range(img_count):
-    path = '/home/haoyuy/scratch_code/projects/pytorch-CycleGAN-and-pix2pix/datasets/iccad13v1.1/test/M1_test%g.glptargetImg.png'%(i+1)
-    img = litho_trans(path)
-    print(img.shape)
-    tg_img = img[:,:,:,:2048]
-    mask_img =img[:,:,:,2048:4096]
-    for j in range(max_iter):
-        #mask_path = '/home/haoyuy/scratch_code/projects/via/v5data/iccad13test/mask/M1_test%g.glp%g.png'%(i+1,j+1)
+import os
+for dirname, dirnames, filenames in os.walk("/home/haoyuy/scratch_code/projects/via/v5data/viav0test/via_test"):
+    for j in range(len(dirnames)):
+        tgt_path = os.path.join(dirname, dirnames[j], 'targetImg.png')
+        tgt_img = litho_trans(tgt_path)
+        for k in range(max_iter):
+            mask_path = os.path.join(dirname, dirnames[j], 'mask%g.png'%(k+1))
+            mask_img = litho_trans(mask_path)
+            _l2, _pvb = lithosim(tgt_img, mask_img)
+            l2[j,k] = _l2
+            pvb[j,k]= _pvb
 
-        _l2, _pvb = lithosim(tg_img, mask_img)
-        l2[i,j] = _l2
-        pvb[i,j]= _pvb
+
 
 
 

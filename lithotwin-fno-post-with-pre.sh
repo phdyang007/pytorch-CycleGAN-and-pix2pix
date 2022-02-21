@@ -1,1 +1,1 @@
-python3 train_lt.py --dataroot ./datasets/iccad13v1.1 --name iccad13v11_lithotwin_fno_pwp --model litho_twin --n_epochs_decay 4 --gpu_ids 4 --batch_size 4 --pool_size 25 --netG_A oinnopc_v001 --netG_B oinnlitho
+python3 train_lt.py --dataroot ./datasets/viav1 --name viav1_lithotwin_nlayer3 --netD n_layers --n_layers_D 3 --model litho_twin --gpu_ids 4 --batch_size 4 --pool_size 25 --netG_A oinnopc --netG_B oinnlitho

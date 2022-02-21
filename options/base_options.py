@@ -33,7 +33,7 @@ class BaseOptions():
         parser.add_argument('--B_nc', type=int, default=1, help='# of mask channels: 3 for RGB and 1 for grayscale')
         parser.add_argument('--C_nc', type=int, default=1, help='# of resist channels: 3 for RGB and 1 for grayscale')
         parser.add_argument('--ngf', type=int, default=24, help='# of gen filters in the last conv layer')
-        parser.add_argument('--ndf', type=int, default=4, help='# of discrim filters in the first conv layer')
+        parser.add_argument('--ndf', type=int, default=16, help='# of discrim filters in the first conv layer')
         parser.add_argument('--netD', type=str, default='basic', help='specify discriminator architecture [basic | n_layers | pixel]. The basic model is a 70x70 PatchGAN. n_layers allows you to specify the layers in the discriminator')
         parser.add_argument('--netG', type=str, default='resnet_9blocks', help='specify generator architecture [resnet_9blocks | resnet_6blocks | unet_256 | unet_128]')
         parser.add_argument('--netG_A', type=str, default='resnet_9blocks', help='specify generator architecture [resnet_9blocks | resnet_6blocks | unet_256 | unet_128]')

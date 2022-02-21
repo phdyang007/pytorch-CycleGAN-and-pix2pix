@@ -74,7 +74,7 @@ class LithoTwinModel(BaseModel):
         mkdir(self.save_dir_pre)
         mkdir(self.save_dir_post)
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
-        self.loss_names = ['G_A', 'cycle_A', 'G_B', 'cycle_B', 'Mask', 'Litho']
+        self.loss_names = ['G_A', 'G_A_GAN', 'D_A', 'G_B', 'cycle_B', 'Mask', 'Litho', 'Zp_T']
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
         visual_names_A = ['real_A', 'fake_B', 'rec_C']
         visual_names_B = ['real_B', 'fake_C', 'real_C']
@@ -84,24 +84,30 @@ class LithoTwinModel(BaseModel):
 
         self.visual_names = visual_names_A + visual_names_B  # combine visualizations for A and B
         if not self.isTrain:
-            self.visual_names = ['real_A', 'fake_B', 'rec_C', 'nominal_C', 'inner_C', 'outer_C', 'real_B', 'fake_C','real_C']#, 'post_B', 'post_nominal_C', 'post_inner_C', 'post_outer_C']
+            if self.opt.lt == False:
+                self.visual_names = ['real_A', 'fake_B', 'rec_C', 'nominal_C', 'inner_C', 'outer_C', 'real_B', 'fake_C','real_C']#, 'post_B', 'post_nominal_C', 'post_inner_C', 'post_outer_C']
+            else:
+                self.visual_names = ['real_A', 'fake_B', 'nominal_C']
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>.
         if self.isTrain:
-            self.model_names = ['G_A', 'G_B']
+            self.model_names = ['G_A', 'G_B', 'D_A']
         else:  # during test time, only load Gs
-            self.model_names = ['G_A', 'G_B']
-
+            if self.opt.lt == True:
+                self.model_names = ['G_A']
+            else:
+                self.model_names = ['G_A', 'G_B']
         # define networks (both Generators and discriminators)
         # The naming is different from those used in the paper.
         # Code (vs. paper): G_A (G), G_B (F), D_A (D_Y), D_B (D_X)
         self.netG_A = networks.define_G(opt.A_nc, opt.B_nc, opt.ngf, opt.netG_A, opt.norm,
                                         not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
-        self.netG_B = networks.define_G(opt.B_nc, opt.C_nc, opt.ngf, opt.netG_B, opt.norm,
-                                        not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
+        if self.opt.lt == False:
+            self.netG_B = networks.define_G(opt.B_nc, opt.C_nc, opt.ngf, opt.netG_B, opt.norm,
+                                            not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
 
-        #if self.isTrain:  # define discriminators
-        #    self.netD_A = networks.define_D(opt.B_nc, opt.ndf, opt.netD,
-        #                                    opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
+        if self.isTrain:  # define discriminators
+            self.netD_A = networks.define_D(opt.B_nc, opt.ndf, opt.netD,
+                                            opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
         #    self.netD_B = networks.define_D(opt.C_nc, opt.ndf, opt.netD,
         #                                    opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
 
@@ -120,7 +126,7 @@ class LithoTwinModel(BaseModel):
             self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG_A.parameters(), self.netG_B.parameters()), lr=opt.lr, betas=(opt.beta1, 0.999))
             self.optimizer_G_A = torch.optim.Adam(self.netG_A.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
             self.optimizer_G_B = torch.optim.Adam(self.netG_B.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-            #self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD_A.parameters(), self.netD_B.parameters()), lr=opt.lr, betas=(opt.beta1, 0.999))
+            self.optimizer_D = torch.optim.Adam(self.netD_A.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
             #self.optimizers.append(self.optimizer_G)
             #self.optimizers.append(self.optimizer_D)
             self.optimizers.append(self.optimizer_G_A)
@@ -141,8 +147,9 @@ class LithoTwinModel(BaseModel):
         """
         AtoB = self.opt.direction == 'AtoB'
         self.real_A = input['A'].to(self.device)
-        self.real_B = input['B'].to(self.device)
-        self.real_C = input['C'].to(self.device)
+        if not self.opt.lt:
+            self.real_B = input['B'].to(self.device)
+            self.real_C = input['C'].to(self.device)
         self.image_paths = input['A_paths' if AtoB else 'B_paths']
 
 
@@ -154,7 +161,8 @@ class LithoTwinModel(BaseModel):
         self.loss_Litho = 0
         self.loss_cycle_A = 0
         self.loss_cycle_B = 0
-
+        self.loss_G_A_GAN = 0
+        self.loss_Zp_T = 0
         if postrain:
             self.visual_names = self.visual_names + ['fake_Bs', 'fake_Cs', 'real_Cs']
 
@@ -164,11 +172,11 @@ class LithoTwinModel(BaseModel):
             self.fake_B = self.netG_A(self.real_A)  # G_A(A)
             self.rec_C = self.netG_B(self.fake_B)   # G_B(G_A(A))
             self.fake_C = self.netG_B(self.real_B)  # G_B(B)
-
+            self.G_A_logit = self.netD_A(self.fake_B)
             if not pretrain:
                 self.fake_Bs = self.fake_B_pool.query(self.fake_B)
-                #self.fake_Bs[self.fake_Bs>0.5]=1
-                #self.fake_Bs[self.fake_Bs<0.5]=0
+                self.fake_Bs[self.fake_Bs>0.5]=1
+                self.fake_Bs[self.fake_Bs<0.5]=0
                 self.fake_Cs = self.netG_B(self.fake_Bs) 
                 for id in range(self.fake_Bs.shape[0]):
                     if id==0:
@@ -178,35 +186,60 @@ class LithoTwinModel(BaseModel):
                         self.real_Cs = torch.cat((self.real_Cs, tmp_Cs), dim=0)
                 self.real_Cs[self.real_Cs>=0.225]=1.0
                 self.real_Cs[self.real_Cs<0.225]=0.0
+
+                ## used to measure Z'-T 
+                self.fake_B2 = self.fake_B
+                for id in range(self.fake_B2.shape[0]):
+                    if id==0:
+                        _, self.fake_C_B2 = self.cl.simulateImageOpt(torch.unsqueeze(self.fake_B2[id],0), LITHO_KERNEL_FOCUS, NOMINAL_DOSE)
+                    else:
+                        _, tmp_Cs = self.cl.simulateImageOpt(torch.unsqueeze(self.fake_B2[id],0), LITHO_KERNEL_FOCUS, NOMINAL_DOSE)
+                        self.fake_C_B2 = torch.cat((self.fake_C_B2, tmp_Cs), dim=0)
+                
         else:
             from datetime import datetime
-            self.fake_B = self.netG_A(self.real_A)  # G_A(A)
-            
-            self.fake_B[self.fake_B>0.5]=0.0
-            self.fake_B[self.fake_B<0.5]=0.0
-            self.rec_C = self.netG_B(self.fake_B)
-            self.rec_C[self.rec_C>=0.225]=1.0
-            self.rec_C[self.rec_C<0.225]=0.0
-            self.fake_C = self.netG_B(self.real_B)
-            self.fake_C[self.fake_C>=0.225]=1.0
-            self.fake_C[self.fake_C<0.225]=0.0
-            _, self.real_C = self.cl.simulateImageOpt(self.real_B, LITHO_KERNEL_FOCUS, NOMINAL_DOSE)
-            self.real_C[self.real_C>=0.225]=1.0
-            self.real_C[self.real_C<0.225]=0.0
-            #metric = []
-            nominal_aerial, self.nominal_C = self.cl.simulateImageOpt(self.fake_B, LITHO_KERNEL_FOCUS, NOMINAL_DOSE)
-            outer_aerial, self.outer_C = self.cl.simulateImageOpt(self.fake_B, LITHO_KERNEL_FOCUS, MAX_DOSE)
-            inner_aerial, self.inner_C = self.cl.simulateImageOpt(self.fake_B, LITHO_KERNEL_DEFOCUS, MIN_DOSE)
-            self.nominal_C[self.nominal_C>=0.225]=1.0
-            self.nominal_C[self.nominal_C<0.225]=0.0
-            self.outer_C[self.outer_C>=0.225]=1.0
-            self.outer_C[self.outer_C<0.225]=0.0
-            self.inner_C[self.inner_C>=0.225]=1.0
-            self.inner_C[self.inner_C<0.225]=0.0
-            aerials = [nominal_aerial, inner_aerial, outer_aerial]
-            m = Metrics(self.real_A, aerials)
-            self.l2, self.pvb = m.get_all()
-            
+            if self.opt.lt==False:
+                self.fake_B = self.netG_A(self.real_A)  # G_A(A)
+                
+                self.fake_B[self.fake_B>0.5]=1.0
+                self.fake_B[self.fake_B<0.5]=0.0
+                self.rec_C = self.netG_B(self.fake_B)
+                self.rec_C[self.rec_C>=0.225]=1.0
+                self.rec_C[self.rec_C<0.225]=0.0
+                self.fake_C = self.netG_B(self.real_B)
+                self.fake_C[self.fake_C>=0.225]=1.0
+                self.fake_C[self.fake_C<0.225]=0.0
+                golden_nominal_C, self.real_C = self.cl.simulateImageOpt(self.real_B, LITHO_KERNEL_FOCUS, NOMINAL_DOSE)
+                golden_outer_C, _ = self.cl.simulateImageOpt(self.real_B, LITHO_KERNEL_FOCUS, MAX_DOSE)
+                golden_inner_C, _ = self.cl.simulateImageOpt(self.real_B, LITHO_KERNEL_DEFOCUS, MIN_DOSE)
+                golden_aerials = [golden_nominal_C, golden_inner_C, golden_outer_C]
+                golden_m = Metrics(self.real_A, golden_aerials)
+                self.g_l2, self.g_pvb = golden_m.get_all()
+                self.real_C[self.real_C>=0.225]=1.0
+                self.real_C[self.real_C<0.225]=0.0
+                #metric = []
+                nominal_aerial, self.nominal_C = self.cl.simulateImageOpt(self.fake_B, LITHO_KERNEL_FOCUS, NOMINAL_DOSE)
+                outer_aerial, self.outer_C = self.cl.simulateImageOpt(self.fake_B, LITHO_KERNEL_FOCUS, MAX_DOSE)
+                inner_aerial, self.inner_C = self.cl.simulateImageOpt(self.fake_B, LITHO_KERNEL_DEFOCUS, MIN_DOSE)
+                self.nominal_C[self.nominal_C>=0.225]=1.0
+                self.nominal_C[self.nominal_C<0.225]=0.0
+                self.outer_C[self.outer_C>=0.225]=1.0
+                self.outer_C[self.outer_C<0.225]=0.0
+                self.inner_C[self.inner_C>=0.225]=1.0
+                self.inner_C[self.inner_C<0.225]=0.0
+                aerials = [nominal_aerial, inner_aerial, outer_aerial]
+                m = Metrics(self.real_A, aerials)
+                self.l2, self.pvb = m.get_all()
+            else:
+                self.fake_B = self.netG_A(self.real_A)
+                self.fake_B[self.fake_B>0.5]=1.0
+                self.fake_B[self.fake_B<0.5]=0.0
+                self.nominal_C = torch.zeros_like(self.fake_B)
+                #for tile_x in range(0,7):
+                #    for tile_y in range(0,7):
+                #        self.nominal_C[:,:,1024*tile_x:1024*tile_x+2048,1024*tile_x:1024*tile_x+2048] = 
+#
+
             #finetune
             """
             self.set_requires_grad([self.netG_A, self.netG_B], False) 
@@ -301,6 +334,33 @@ class LithoTwinModel(BaseModel):
         #self.backward_D_B()      # calculate graidents for D_B
         #self.optimizer_D.step()  # update D_A and D_B's weights
     
+
+    def backward_D_basic(self, netD, real, fake):
+        """Calculate GAN loss for the discriminator
+
+        Parameters:
+            netD (network)      -- the discriminator D
+            real (tensor array) -- real images
+            fake (tensor array) -- images generated by a generator
+
+        Return the discriminator loss.
+        We also call loss_D.backward() to calculate the gradients.
+        """
+        # Real
+        pred_real = netD(real)
+        loss_D_real = self.criterionGAN(pred_real, True)
+        # Fake
+        pred_fake = netD(fake.detach())
+        loss_D_fake = self.criterionGAN(pred_fake, False)
+        # Combined loss and calculate gradients
+        loss_D = (loss_D_real + loss_D_fake) * 0.5
+        loss_D.backward()
+        return loss_D
+
+    def backward_D_A(self):
+        """Calculate GAN loss for discriminator D_A"""
+        fake_B = self.fake_B_pool.query(self.fake_B)
+        self.loss_D_A = self.backward_D_basic(self.netD_A, self.real_B, fake_B)
     
     def backward_G_A_pretrain(self):
         
@@ -344,9 +404,15 @@ class LithoTwinModel(BaseModel):
         
         self.loss_G_A = self.criterionMask(self.fake_B, self.real_B) #mask v.s. ground mask  us L1 loss to avoid blur for the sake of litho accuracy.
 
-        self.loss_Mask  = self.criterionLitho(self.rec_C, self.real_A) #how good is generated mask in terms of litho results
 
-        self.loss_G_A_   = self.loss_G_A + self.loss_Mask
+        #fake_B = self.fake_B_pool.query(self.fake_B)
+
+        self.loss_G_A_GAN = self.criterionGAN(self.G_A_logit, True)
+
+        self.loss_Mask  = self.criterionLitho(self.rec_C, self.real_A) #how good is generated mask in terms of litho results    z and T
+
+        self.loss_G_A_   = self.loss_G_A + self.loss_Mask + self.loss_G_A_GAN
+
  
 
         self.loss_G_A_.backward()
@@ -355,8 +421,9 @@ class LithoTwinModel(BaseModel):
     def backward_G_B_postrain(self):
 
         self.loss_G_B = self.criterionLitho(self.fake_C, self.real_C) #resist v.s. ground resist us L2 for better fitting.
-        self.loss_Litho = self.criterionLitho(self.fake_Cs, self.real_Cs) #how good is ML litho
+        self.loss_Litho = self.criterionLitho(self.fake_Cs, self.real_Cs) #how good is ML litho  z and z'
         self.loss_G_B_   = self.loss_G_B + self.loss_Litho
+        self.loss_Zp_T = self.criterionLitho(self.fake_C_B2, self.real_A)
         self.loss_G_B_.backward()
 
         
@@ -366,9 +433,11 @@ class LithoTwinModel(BaseModel):
         self.forward(False)
         # G_A and G_B
         #self.set_requires_grad([self.netD_A, self.netD_B], False)  # Ds require no gradients when optimizing Gs
-        self.optimizer_G_A.zero_grad()  # set G_A gradients to zero
         self.set_requires_grad([self.netG_A], True)  #update masknet
         self.set_requires_grad([self.netG_B], False) #update masknet and lithonet seperately.
+        self.set_requires_grad([self.netD_A], False)  # Ds require no gradients when optimizing Gs
+        self.optimizer_G_A.zero_grad()  # set G_A gradients to zero
+
         self.backward_G_A_postrain() #get gradients for G_A
         self.optimizer_G_A.step()  #update G_A
         self.optimizer_G_B.zero_grad()  # set G_B's gradients to zero
@@ -376,7 +445,11 @@ class LithoTwinModel(BaseModel):
         self.set_requires_grad([self.netG_A], False) #update masknet and lithonet seperately.
         self.backward_G_B_postrain() #get gradients for G_B
         self.optimizer_G_B.step()
-    
+
+        self.set_requires_grad([self.netD_A], True)  # Ds require no gradients when optimizing Gs
+        self.optimizer_D.zero_grad()   # set D_A and D_B's gradients to zero
+        self.backward_D_A()      # calculate gradients for D_A
+        self.optimizer_D.step()  # update D_A and D_B's weights
     def reset_optimizer(self):
             #self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG_A.parameters(), self.netG_B.parameters()), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
             self.optimizer_G_A = torch.optim.Adam(self.netG_A.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))

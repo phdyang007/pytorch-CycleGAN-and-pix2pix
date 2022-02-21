@@ -1,0 +1,1 @@
+python3 test_lt_8k.py --dataroot ./datasets/viav1 --name viav1_lithotwin_nlayer3 --netD n_layers --n_layers_D 3 --model litho_twin --gpu_ids 0,4 --batch_size 1 --lt --lt_phase 1 --netG_A oinnopc_large --netG_B oinnlitho
