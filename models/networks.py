@@ -162,6 +162,8 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
         net = oinnopc_v001(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
     elif netG == 'oinnopc_large':
         net = oinnopc_large(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
+    elif netG == 'oinnopc_multi':
+        net == oinnopc_multi(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % netG)
     return init_net(net, init_type, init_gain, gpu_ids)
@@ -978,6 +980,41 @@ class NestedUNet(nn.Module):
                 output = self.final(x0_4)
                 output = output * self.lambda_o
             return output[:,:,12:-12,12:-12]
+
+
+
+
+
+
+class oinnopc_multi(nn.Module):
+    def __init__(self, modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3, oinn_num = 4):
+        super(oinnopc, self).__init__()
+
+        # from design to mask, four concatenated 
+
+        self.modes1 = modes1
+        self.modes2 = modes2
+        self.width = width
+        self.refine_kernel = refine_kernel
+        self.in_channel = in_channel
+        self.refine_channel = refine_channel
+        self.smooth_kernel = smooth_kernel   
+        self.oinn_num = oinn_num
+        self.layers = nn.Sequential()
+
+        for i in range(oinn_num):
+            self.layers.add_module("oinn%g"%(i+1), oinnopc(modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3))
+
+    def forward(self, x): 
+        x = self.layers(x)
+
+        return x 
+
+
+
+
+
+
 
 class oinnopc(nn.Module): 
     def __init__(self, modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3):
