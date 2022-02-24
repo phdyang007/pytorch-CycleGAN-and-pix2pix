@@ -154,6 +154,8 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
         net = UnetGenerator(input_nc, output_nc, 7, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
     elif netG == 'unet_256':
         net = UnetGenerator(input_nc, output_nc, 8, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    elfi netG == 'dcgan':
+        net = DCGenerator(nz=input_nc, ngf=ngf, nc=output_nc)
     elif netG == 'oinnlitho':
         net = oinnlitho(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
     elif netG == 'oinnopc':
@@ -208,6 +210,8 @@ def define_D(input_nc, ndf, netD, n_layers_D=3, norm='batch', init_type='normal'
         net = NLayerDiscriminator(input_nc, ndf, n_layers_D, norm_layer=norm_layer)
     elif netD == 'pixel':     # classify if each pixel is real or fake
         net = PixelDiscriminator(input_nc, ndf, norm_layer=norm_layer)
+    elif netD = 'dcgan':
+        net = DCDiscriminator(input_nc, ndf)
     else:
         raise NotImplementedError('Discriminator model name [%s] is not recognized' % netD)
     return init_net(net, init_type, init_gain, gpu_ids)
@@ -369,7 +373,97 @@ def cal_gradient_penalty(netD, real_data, fake_data, device, type='mixed', const
     else:
         return 0.0, None
 
+class DCGenerator(nn.Module):
+    """DCGAN from "UNSUPERVISED REPRESENTATION LEARNING WITH DEEP CONVOLUTIONAL GENERATIVE ADVERSARIAL NETWORKS"
 
+    Implementations based on https://pytorch.org/tutorials/beginner/dcgan_faces_tutorial.html
+    """
+    def __init__(self, nz=128, ngf=64, nc=1):
+        """Construct a deep convolution generator
+
+        Parameters:
+            nz (int)            -- dimension of hiddent z
+            ngf(int)            -- depth of generator feature map
+            nc (int)            -- dimension output channel
+        """
+        super(DCGenerator, self).__init__()
+        self.upsample = nn.Upsample(scale_factor=8, mode='nearest')
+            # Convert state size. (nc) x 2048 x 2048
+        self.model = nn.Sequential(
+            # input is Z, going into a convolution
+            nn.ConvTranspose2d(nz, ngf * 32, 4, 1, 0, bias=False),
+            nn.BatchNorm2d(ngf * 32),
+            nn.ReLU(True),
+            # state size. (ngf*32) x 4 x 4
+            nn.ConvTranspose2d(ngf * 32, ngf * 16, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf * 16),
+            nn.ReLU(True),
+            # state size. (ngf*16) x 8 x 8
+            nn.ConvTranspose2d(ngf * 16, ngf * 8, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf * 8),
+            nn.ReLU(True),
+            # state size. (ngf*8) x 16 x 16
+            nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf * 4),
+            nn.ReLU(True),
+            # state size. (ngf*4) x 32 x 32
+            nn.ConvTranspose2d( ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf * 2),
+            nn.ReLU(True),
+            # state size. (ngf*2) x 64 x 64
+            nn.ConvTranspose2d( ngf * 2, ngf, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf),
+            nn.ReLU(True),
+            # state size. (ngf) x 128 x 128
+            nn.ConvTranspose2d( ngf, nc, 4, 2, 1, bias=False),
+            nn.Tanh(),
+            # state size. (nc) x 256 x 256
+        )
+
+    def forward(self, input):
+        return self.model(input)
+
+class DCDiscriminator(nn.Module):
+    def __init__(self, nc=1, ndf=64):
+        """Construct a deep convolution discriminator
+
+        Parameters:
+            nc (int)            -- dimension input channel
+            ndf(int)            -- depth of generator feature map
+        """
+        super(DCDiscriminator, self).__init__()
+        self.model = nn.Sequential(
+            # input is (nc) x 256 x 256
+            nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
+            nn.LeakyReLU(0.2, inplace=True),
+            # state size. (ndf) x 128 x 128
+            nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf * 2),
+            nn.LeakyReLU(0.2, inplace=True),
+            # state size. (ndf*2) x 64 x 64
+            nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf * 4),
+            nn.LeakyReLU(0.2, inplace=True),
+            # state size. (ndf*4) x 32 x 32
+            nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf * 8),
+            nn.LeakyReLU(0.2, inplace=True),
+            # state size. (ndf*8) x 16 x 16
+            nn.Conv2d(ndf * 8, ndf * 16, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf * 16),
+            nn.LeakyReLU(0.2, inplace=True),
+            # state size. (ndf*16) x 8 x 8
+            nn.Conv2d(ndf * 16, ndf * 32, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf * 32),
+            nn.LeakyReLU(0.2, inplace=True),
+            # state size. (ndf*32) x 4 x 4
+            nn.Conv2d(ndf * 32, 1, 4, 1, 0, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, input):
+        return self.model(input)
+    
 class ResnetGenerator(nn.Module):
     """Resnet-based generator that consists of Resnet blocks between a few downsampling/upsampling operations.
 
@@ -980,11 +1074,6 @@ class NestedUNet(nn.Module):
                 output = self.final(x0_4)
                 output = output * self.lambda_o
             return output[:,:,12:-12,12:-12]
-
-
-
-
-
 
 class oinnopc_multi(nn.Module):
     def __init__(self, modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3, oinn_num = 4):
