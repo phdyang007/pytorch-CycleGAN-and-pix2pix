@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.nn import init
+from torch.nn import ini
 import functools
 from torch.optim import lr_scheduler
 

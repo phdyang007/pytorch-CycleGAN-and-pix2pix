@@ -2,6 +2,13 @@ import torch
 from .base_model import BaseModel
 from . import networks
 
+import sys 
+sys.path.append('./models/develset')
+from models.develset.src.models.const import *
+from models.develset.src.models.kernels import Kernel
+from models.develset.src.metrics.metrics import Metrics
+from models.develset.src.models.litho_layer import CUDA_LITHO
+from models.develset.lithosim import *
 
 class LithoGAN(BaseModel):
     """ This class implements the pix2pix model, for learning a mapping from input images to output images given paired data.
@@ -43,32 +50,55 @@ class LithoGAN(BaseModel):
             opt (Option class)-- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
         BaseModel.__init__(self, opt)
+        self.trainGAN, self.trainF = opt.trainGAN, opt.trainF
+        assert self.trainGAN or self.trainF
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
-        self.loss_names = ['G_GAN', 'G_L1', 'D_real', 'D_fake']
+        self.loss_names = []
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
-        self.visual_names = ['real_A', 'fake_B', 'real_B']
+        self.visual_names = []
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>
-        if self.isTrain:
+        self.model_names = []
+        if self.trainGAN:
             self.model_names = ['G', 'D']
+            self.loss_names = ['G_GAN', 'G_L1', 'D_real', 'D_fake']
+            self.visual_names = ['fake', 'real']
+        if self.trainF:
+            self.model_names.append('F')
+            self.loss_names.append('F_real')
+            self.visual_names.append('real_mask')
+            self.visual_names.append('real_resist')
+            if self.trainGAN:
+                self.loss_names.append('F_fake')
+                self.loss_names.append('F_attack')
+                self.visual_names.append('fake_mask')
+                self.visual_names.append('fake_resist')
         else:  # during test time, only load G
-            self.model_names = ['G']
+            self.model_names = ['G', 'F']
         # define networks (both generator and discriminator)
         self.netG = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netG, opt.norm,
                                       not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
+        
+        self.netF = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netF, opt.norm,
+                                      not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
 
-        if self.isTrain:  # define a discriminator; conditional GANs need to take both input and output images; Therefore, #channels for D is input_nc + output_nc
-            self.netD = networks.define_D(opt.input_nc + opt.output_nc, opt.ndf, opt.netD,
+        if self.isTrain:  # define a discriminator; 
+            self.netD = networks.define_D(opt.input_nc, opt.ndf, opt.netD,
                                           opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
 
         if self.isTrain:
             # define loss functions
             self.criterionGAN = networks.GANLoss(opt.gan_mode).to(self.device)
-            self.criterionL1 = torch.nn.L1Loss()
+            self.criterionLitho = torch.nn.MSELoss()
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             self.optimizer_G = torch.optim.Adam(self.netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
             self.optimizer_D = torch.optim.Adam(self.netD.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+            self.optimizer_F = torch.optim.Adam(self.netF.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
+            self.optimizers.append(self.optimizer_F)
+            
+        self.kernel = Kernel()
+        self.cl = CUDA_LITHO(self.kernel)
 
     def set_input(self, input):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
@@ -78,50 +108,90 @@ class LithoGAN(BaseModel):
 
         The option 'direction' can be used to swap images in domain A and domain B.
         """
-        AtoB = self.opt.direction == 'AtoB'
-        self.real_A = input['A' if AtoB else 'B'].to(self.device)
-        self.real_B = input['B' if AtoB else 'A'].to(self.device)
-        self.image_paths = input['A_paths' if AtoB else 'B_paths']
+        self.real = input['real']
+        
+    def legalize_mask(self, mask):
+        mask[mask >= 0.5] = 1
+        mask[mask < 0.5] = 0
+        return mask
+    
+    def legalize_resist(self, resist):
+        resist[resist >= 0.225] = 1.0
+        resist[resist < 0.225] = 0.0
+        return resist
+    
+    def simulate(self, mask):
+        for id in range(mask[0]):
+            if id == 0:
+                _, resist = self.cl.simulateImageOpt(torch.unsqueeze(mask[id],0), LITHO_KERNEL_FOCUS, NOMINAL_DOSE)
+            else:
+                _, tmp = self.cl.simulateImageOpt(torch.unsqueeze(mask[id],0), LITHO_KERNEL_FOCUS, NOMINAL_DOSE)
+                resist = torch.cat((resist, tmp), dim=0)
+        return self.legalize_resist(resist)
+    
+    def foward(self):
+        if self.trainGAN:
+            self.forward_G()
+        if self.trainF:
+            self.foward_F()
 
-    def forward(self):
+    def forward_G(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
-        self.fake_B = self.netG(self.real_A)  # G(A)
-
+        noise = torch.randn(opt.batch_size, opt.input_nz, 1, 1, device=self.device)
+        self.fake = self.netG(noise)
+        
+    def forward_F(self):
+        if self.trainGAN:
+            self.legal_fake = self.legalize_mask(self.fake)
+            self.fake_mask = self.netF(self.legal_fake)    
+        self.real_mask = self.netF(self.real)
+        
     def backward_D(self):
         """Calculate GAN loss for the discriminator"""
-        # Fake; stop backprop to the generator by detaching fake_B
-        fake_AB = torch.cat((self.real_A, self.fake_B), 1)  # we use conditional GANs; we need to feed both input and output to the discriminator
-        pred_fake = self.netD(fake_AB.detach())
+        pred_fake = self.netD(self.fake.detach())
         self.loss_D_fake = self.criterionGAN(pred_fake, False)
-        # Real
-        real_AB = torch.cat((self.real_A, self.real_B), 1)
-        pred_real = self.netD(real_AB)
+        pred_real = self.netD(self.real)
         self.loss_D_real = self.criterionGAN(pred_real, True)
-        # combine loss and calculate gradients
         self.loss_D = (self.loss_D_fake + self.loss_D_real) * 0.5
         self.loss_D.backward()
 
     def backward_G(self):
         """Calculate GAN and L1 loss for the generator"""
-        # First, G(A) should fake the discriminator
-        fake_AB = torch.cat((self.real_A, self.fake_B), 1)
-        pred_fake = self.netD(fake_AB)
+        pred_fake = self.netD(self.fake)
         self.loss_G_GAN = self.criterionGAN(pred_fake, True)
-        # Second, G(A) = B
-        self.loss_G_L1 = self.criterionL1(self.fake_B, self.real_B) * self.opt.lambda_L1
-        # combine loss and calculate gradients
+        self.loss_G_L1, _ = networks.cal_gradient_penalty(self.netG, self.real, self.fake, self.device)
         self.loss_G = self.loss_G_GAN + self.loss_G_L1
         self.loss_G.backward()
-
+        
+    def backward_F(self):
+        self.real_resist = self.simulate(self.real)
+        self.loss_F_real = self.criterionLitho(self.real_resist, self.real_mask)  
+        self.loss_F = self.loss_F_real 
+        if self.trainGAN:
+            self.fake_resist = self.simulate(self.legal_fake)
+            self.loss_F_fake = self.criterionLitho(self.fake_resist, self.fake_mask)
+            self.loss_F += self.loss_F_fake
+        self.loss_F.backward()
+            
     def optimize_parameters(self):
-        self.forward()                   # compute fake images: G(A)
-        # update D
-        self.set_requires_grad(self.netD, True)  # enable backprop for D
-        self.optimizer_D.zero_grad()     # set D's gradients to zero
-        self.backward_D()                # calculate gradients for D
-        self.optimizer_D.step()          # update D's weights
-        # update G
-        self.set_requires_grad(self.netD, False)  # D requires no gradients when optimizing G
-        self.optimizer_G.zero_grad()        # set G's gradients to zero
-        self.backward_G()                   # calculate graidents for G
-        self.optimizer_G.step()             # udpate G's weights
+        #self.forward()                   # compute fake images: G(A)
+        if self.trainGAN:
+            self.forward()
+            if self.trainF:
+                self.set_requires_grad(self.netF, False) # Fix F when attacking
+            # update D
+            self.set_requires_grad(self.netD, True)  # enable backprop for D
+            self.optimizer_D.zero_grad()     # set D's gradients to zero
+            self.backward_D()                # calculate gradients for D
+            self.optimizer_D.step()          # update D's weights
+            # update G
+            self.set_requires_grad(self.netD, False)  # D requires no gradients when optimizing G
+            self.optimizer_G.zero_grad()        # set G's gradients to zero
+            self.backward_G()                   # calculate graidents for G
+            self.optimizer_G.step()             # udpate G's weights
+        if self.trainF:
+            self.forward()
+            self.set_requires_grad(self.netF, True)
+            self.optimizer_F.zero_grad()
+            self.backward_F()
+            self.optimizer_F.step()
