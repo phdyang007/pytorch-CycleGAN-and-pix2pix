@@ -416,7 +416,7 @@ class DCGenerator(nn.Module):
             nn.ReLU(True),
             # state size. (ngf) x 128 x 128
             nn.ConvTranspose2d( ngf, nc, 4, 2, 1, bias=False),
-            nn.Tanh(),
+            nn.Tanh()
             # state size. (nc) x 256 x 256
         )
 
@@ -457,8 +457,7 @@ class DCDiscriminator(nn.Module):
             nn.BatchNorm2d(ndf * 32),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*32) x 4 x 4
-            nn.Conv2d(ndf * 32, 1, 4, 1, 0, bias=False),
-            nn.Sigmoid()
+            nn.Conv2d(ndf * 32, 1, 4, 1, 0, bias=False)
         )
 
     def forward(self, input):

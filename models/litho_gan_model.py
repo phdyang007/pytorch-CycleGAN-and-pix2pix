@@ -36,10 +36,13 @@ class LithoGAN(BaseModel):
         By default, we use vanilla GAN loss, UNet with batchnorm, and aligned datasets.
         """
         # changing the default values to match the pix2pix paper (https://phillipi.github.io/pix2pix/)
-        parser.set_defaults(norm='batch', netG='unet_256', dataset_mode='aligned')
+        parser.set_defaults(netG='dcgan', netD='dcgan')
+        parser.add_argument('netF', type=str, default='oinnopc', help='specify litho architecture [oinnopc]')
+        parser.add_argument('trainGAN', type=bool, default=True, help='whether to include GAN model for train/test')
+        parser.add_argument('trainF', type=bool, default=True, help='whether to include F model')
         if is_train:
-            parser.set_defaults(pool_size=0, gan_mode='vanilla')
-            parser.add_argument('--lambda_L1', type=float, default=100.0, help='weight for L1 loss')
+            parser.set_defaults(gan_mode='wgangp')
+            parser.add_argument('--lambda_attack', type=float, default=10.0, help='weight for F attack loss')
 
         return parser
 
@@ -59,7 +62,10 @@ class LithoGAN(BaseModel):
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>
         self.model_names = []
         if self.trainGAN:
-            self.model_names = ['G', 'D']
+            if self.isTrain:
+                self.model_names = ['G', 'D']
+            else:
+                self.model_names = ['G']
             self.loss_names = ['G_GAN', 'G_L1', 'D_real', 'D_fake']
             self.visual_names = ['fake', 'real']
         if self.trainF:
@@ -72,16 +78,15 @@ class LithoGAN(BaseModel):
                 self.loss_names.append('F_attack')
                 self.visual_names.append('fake_mask')
                 self.visual_names.append('fake_resist')
-        else:  # during test time, only load G
-            self.model_names = ['G', 'F']
         # define networks (both generator and discriminator)
-        self.netG = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netG, opt.norm,
+        if self.trainGAN:
+            self.netG = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netG, opt.norm,
                                       not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
-        
-        self.netF = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netF, opt.norm,
+        if self.trainF:
+            self.netF = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netF, opt.norm,
                                       not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
 
-        if self.isTrain:  # define a discriminator; 
+        if self.isTrain and self.trainGAN:  # define a discriminator; 
             self.netD = networks.define_D(opt.input_nc, opt.ndf, opt.netD,
                                           opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
 
@@ -90,15 +95,17 @@ class LithoGAN(BaseModel):
             self.criterionGAN = networks.GANLoss(opt.gan_mode).to(self.device)
             self.criterionLitho = torch.nn.MSELoss()
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
-            self.optimizer_G = torch.optim.Adam(self.netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-            self.optimizer_D = torch.optim.Adam(self.netD.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-            self.optimizer_F = torch.optim.Adam(self.netF.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-            self.optimizers.append(self.optimizer_G)
-            self.optimizers.append(self.optimizer_D)
-            self.optimizers.append(self.optimizer_F)
-            
-        self.kernel = Kernel()
-        self.cl = CUDA_LITHO(self.kernel)
+            if self.trainGAN:
+                self.optimizer_G = torch.optim.Adam(self.netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+                self.optimizer_D = torch.optim.Adam(self.netD.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+                self.optimizers.append(self.optimizer_G)
+                self.optimizers.append(self.optimizer_D)
+            if self.trainF:
+                self.optimizer_F = torch.optim.Adam(self.netF.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+                self.optimizers.append(self.optimizer_F)
+                
+                self.kernel = Kernel()
+                self.cl = CUDA_LITHO(self.kernel)
 
     def set_input(self, input):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
@@ -111,16 +118,20 @@ class LithoGAN(BaseModel):
         self.real = input['real']
         
     def legalize_mask(self, mask):
+        """Legalize the mask generated from GAN."""
         mask[mask >= 0.5] = 1
         mask[mask < 0.5] = 0
         return mask
     
     def legalize_resist(self, resist):
+        """Legalize the resist from litho simulator."""
         resist[resist >= 0.225] = 1.0
         resist[resist < 0.225] = 0.0
         return resist
     
     def simulate(self, mask):
+        """Call litho simulator with input legal masks
+        """
         for id in range(mask[0]):
             if id == 0:
                 _, resist = self.cl.simulateImageOpt(torch.unsqueeze(mask[id],0), LITHO_KERNEL_FOCUS, NOMINAL_DOSE)
@@ -130,13 +141,13 @@ class LithoGAN(BaseModel):
         return self.legalize_resist(resist)
     
     def foward(self):
+        """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         if self.trainGAN:
             self.forward_G()
         if self.trainF:
             self.foward_F()
 
     def forward_G(self):
-        """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         noise = torch.randn(opt.batch_size, opt.input_nz, 1, 1, device=self.device)
         self.fake = self.netG(noise)
         
@@ -161,6 +172,10 @@ class LithoGAN(BaseModel):
         self.loss_G_GAN = self.criterionGAN(pred_fake, True)
         self.loss_G_L1, _ = networks.cal_gradient_penalty(self.netG, self.real, self.fake, self.device)
         self.loss_G = self.loss_G_GAN + self.loss_G_L1
+        if self.trainF:
+            self.fake_resist = self.simulate(self.legal_fake)
+            self.loss_F_attack = self.criterionLitho(self.fake_resist, self.fake_mask)
+            self.loss_G -= self.loss_F_attack * self.opt.lambda_attack
         self.loss_G.backward()
         
     def backward_F(self):
@@ -174,7 +189,7 @@ class LithoGAN(BaseModel):
         self.loss_F.backward()
             
     def optimize_parameters(self):
-        #self.forward()                   # compute fake images: G(A)
+        # Iterative train GAN and F
         if self.trainGAN:
             self.forward()
             if self.trainF:
@@ -189,6 +204,7 @@ class LithoGAN(BaseModel):
             self.optimizer_G.zero_grad()        # set G's gradients to zero
             self.backward_G()                   # calculate graidents for G
             self.optimizer_G.step()             # udpate G's weights
+            
         if self.trainF:
             self.forward()
             self.set_requires_grad(self.netF, True)
