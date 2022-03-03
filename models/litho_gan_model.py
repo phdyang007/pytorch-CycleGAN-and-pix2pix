@@ -40,6 +40,7 @@ class LithoGAN(BaseModel):
         parser.add_argument('netF', type=str, default='oinnopc', help='specify litho architecture [oinnopc]')
         parser.add_argument('trainGAN', type=bool, default=True, help='whether to include GAN model for train/test')
         parser.add_argument('trainF', type=bool, default=True, help='whether to include F model')
+        parser.add_argument('input_zdim', type=int, default=128, help='input Z dimension to GAN')
         if is_train:
             parser.set_defaults(gan_mode='wgangp')
             parser.add_argument('--lambda_attack', type=float, default=10.0, help='weight for F attack loss')
@@ -67,7 +68,7 @@ class LithoGAN(BaseModel):
             else:
                 self.model_names = ['G']
             self.loss_names = ['G_GAN', 'G_L1', 'D_real', 'D_fake']
-            self.visual_names = ['fake', 'real']
+            self.visual_names = ['fake', 'real_low_res']
         if self.trainF:
             self.model_names.append('F')
             self.loss_names.append('F_real')
@@ -80,7 +81,7 @@ class LithoGAN(BaseModel):
                 self.visual_names.append('fake_resist')
         # define networks (both generator and discriminator)
         if self.trainGAN:
-            self.netG = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netG, opt.norm,
+            self.netG = networks.define_G(opt.input_zdim, opt.input_nc, opt.ngf, opt.netG, opt.norm,
                                       not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
         if self.trainF:
             self.netF = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netF, opt.norm,
@@ -115,7 +116,8 @@ class LithoGAN(BaseModel):
 
         The option 'direction' can be used to swap images in domain A and domain B.
         """
-        self.real = input['real']
+        self.real_low_res = input['real_low_res']
+        self.real_high_res = input['real_high_res']
         
     def legalize_mask(self, mask):
         """Legalize the mask generated from GAN."""
@@ -154,14 +156,15 @@ class LithoGAN(BaseModel):
     def forward_F(self):
         if self.trainGAN:
             self.legal_fake = self.legalize_mask(self.fake)
-            self.fake_mask = self.netF(self.legal_fake)    
-        self.real_mask = self.netF(self.real)
+            self.legal_fake_high_res = self.netG.upsample(self.legal_fak)
+            self.fake_mask = self.netF(self.legal_fake_high_res)    
+        self.real_mask = self.netF(self.real_high_res)
         
     def backward_D(self):
         """Calculate GAN loss for the discriminator"""
         pred_fake = self.netD(self.fake.detach())
         self.loss_D_fake = self.criterionGAN(pred_fake, False)
-        pred_real = self.netD(self.real)
+        pred_real = self.netD(self.real_low_res)
         self.loss_D_real = self.criterionGAN(pred_real, True)
         self.loss_D = (self.loss_D_fake + self.loss_D_real) * 0.5
         self.loss_D.backward()
@@ -170,7 +173,7 @@ class LithoGAN(BaseModel):
         """Calculate GAN and L1 loss for the generator"""
         pred_fake = self.netD(self.fake)
         self.loss_G_GAN = self.criterionGAN(pred_fake, True)
-        self.loss_G_L1, _ = networks.cal_gradient_penalty(self.netG, self.real, self.fake, self.device)
+        self.loss_G_L1, _ = networks.cal_gradient_penalty(self.netG, self.real_low_res, self.fake, self.device)
         self.loss_G = self.loss_G_GAN + self.loss_G_L1
         if self.trainF:
             self.fake_resist = self.simulate(self.legal_fake)
@@ -179,7 +182,7 @@ class LithoGAN(BaseModel):
         self.loss_G.backward()
         
     def backward_F(self):
-        self.real_resist = self.simulate(self.real)
+        self.real_resist = self.simulate(self.real_high_res)
         self.loss_F_real = self.criterionLitho(self.real_resist, self.real_mask)  
         self.loss_F = self.loss_F_real 
         if self.trainGAN:

@@ -77,6 +77,18 @@ def get_params(opt, size):
 
     return {'crop_pos': (x, y), 'flip': flip}
 
+def get_resize_transform(opt, params=None, grayscale=True, method.Image.BICUBIC, convert=True, resize=True):
+    transform_list = []
+    transform_list.append(transforms.Grayscale(1))
+    if resize:
+        osize = [opt.crop_size, opt.crop_size]
+        transform_list.append(transforms.Resize(osize, method))
+        
+    if convert:
+        transform_list += [transforms.ToTensor()]
+        
+    return transforms.Compose(transform_list)
+
 
 def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, convert=True):
     transform_list = []
