@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.nn import ini
+from torch.nn import init
 import functools
 from torch.optim import lr_scheduler
 
@@ -154,7 +154,7 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
         net = UnetGenerator(input_nc, output_nc, 7, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
     elif netG == 'unet_256':
         net = UnetGenerator(input_nc, output_nc, 8, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
-    elfi netG == 'dcgan':
+    elif netG == 'dcgan':
         net = DCGenerator(nz=input_nc, ngf=ngf, nc=output_nc)
     elif netG == 'oinnlitho':
         net = oinnlitho(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
@@ -210,7 +210,7 @@ def define_D(input_nc, ndf, netD, n_layers_D=3, norm='batch', init_type='normal'
         net = NLayerDiscriminator(input_nc, ndf, n_layers_D, norm_layer=norm_layer)
     elif netD == 'pixel':     # classify if each pixel is real or fake
         net = PixelDiscriminator(input_nc, ndf, norm_layer=norm_layer)
-    elif netD = 'dcgan':
+    elif netD == 'dcgan':
         net = DCDiscriminator(input_nc, ndf)
     else:
         raise NotImplementedError('Discriminator model name [%s] is not recognized' % netD)

@@ -10,7 +10,7 @@ from models.develset.src.metrics.metrics import Metrics
 from models.develset.src.models.litho_layer import CUDA_LITHO
 from models.develset.lithosim import *
 
-class LithoGAN(BaseModel):
+class LithoGANModel(BaseModel):
     """ This class implements the pix2pix model, for learning a mapping from input images to output images given paired data.
 
     The model training requires '--dataset_mode aligned' dataset.
@@ -37,14 +37,14 @@ class LithoGAN(BaseModel):
         """
         # changing the default values to match the pix2pix paper (https://phillipi.github.io/pix2pix/)
         parser.set_defaults(netG='dcgan', netD='dcgan')
-        parser.add_argument('netF', type=str, default='oinnopc', help='specify litho architecture [oinnopc]')
-        parser.add_argument('trainGAN', type=bool, default=True, help='whether to include GAN model for train/test')
-        parser.add_argument('trainF', type=bool, default=True, help='whether to include F model')
-        parser.add_argument('input_zdim', type=int, default=128, help='input Z dimension to GAN')
+        parser.add_argument('--netF', type=str, default='oinnopc', help='specify litho architecture [oinnopc]')
+        parser.add_argument('--trainGAN', type=bool, default=True, help='whether to include GAN model for train/test')
+        parser.add_argument('--trainF', type=bool, default=False, help='whether to include F model')
+        parser.add_argument('--input_zdim', type=int, default=128, help='input Z dimension to GAN')
         if is_train:
             parser.set_defaults(gan_mode='wgangp')
             parser.add_argument('--lambda_attack', type=float, default=10.0, help='weight for F attack loss')
-
+            parser.add_argument('--grad_norm', type=bool, default=False, help='include gradient penalty for GAN training')
         return parser
 
     def __init__(self, opt):
@@ -67,7 +67,9 @@ class LithoGAN(BaseModel):
                 self.model_names = ['G', 'D']
             else:
                 self.model_names = ['G']
-            self.loss_names = ['G_GAN', 'G_L1', 'D_real', 'D_fake']
+            self.loss_names = ['G_GAN', 'D_real', 'D_fake']
+            if self.opt.grad_norm:
+                self.loss_names.append('G_L1')
             self.visual_names = ['fake', 'real_low_res']
         if self.trainF:
             self.model_names.append('F')
@@ -116,8 +118,8 @@ class LithoGAN(BaseModel):
 
         The option 'direction' can be used to swap images in domain A and domain B.
         """
-        self.real_low_res = input['real_low_res']
-        self.real_high_res = input['real_high_res']
+        self.real_low_res = input['real_low_res'].to(self.device)
+        self.real_high_res = input['real_high_res'].to(self.device)
         
     def legalize_mask(self, mask):
         """Legalize the mask generated from GAN."""
@@ -142,7 +144,7 @@ class LithoGAN(BaseModel):
                 resist = torch.cat((resist, tmp), dim=0)
         return self.legalize_resist(resist)
     
-    def foward(self):
+    def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         if self.trainGAN:
             self.forward_G()
@@ -150,7 +152,7 @@ class LithoGAN(BaseModel):
             self.foward_F()
 
     def forward_G(self):
-        noise = torch.randn(opt.batch_size, opt.input_nz, 1, 1, device=self.device)
+        noise = torch.randn(self.opt.batch_size, self.opt.input_zdim, 1, 1, device=self.device)
         self.fake = self.netG(noise)
         
     def forward_F(self):
@@ -173,8 +175,11 @@ class LithoGAN(BaseModel):
         """Calculate GAN and L1 loss for the generator"""
         pred_fake = self.netD(self.fake)
         self.loss_G_GAN = self.criterionGAN(pred_fake, True)
-        self.loss_G_L1, _ = networks.cal_gradient_penalty(self.netG, self.real_low_res, self.fake, self.device)
-        self.loss_G = self.loss_G_GAN + self.loss_G_L1
+        if self.opt.grad_norm:
+            self.loss_G_L1, _ = networks.cal_gradient_penalty(self.netD, self.real_low_res, self.fake, self.device)
+            self.loss_G = self.loss_G_GAN + self.loss_G_L1
+        else:
+            self.loss_G = self.loss_G_GAN
         if self.trainF:
             self.fake_resist = self.simulate(self.legal_fake)
             self.loss_F_attack = self.criterionLitho(self.fake_resist, self.fake_mask)

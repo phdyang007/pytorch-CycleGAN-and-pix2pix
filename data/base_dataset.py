@@ -77,7 +77,7 @@ def get_params(opt, size):
 
     return {'crop_pos': (x, y), 'flip': flip}
 
-def get_resize_transform(opt, params=None, grayscale=True, method.Image.BICUBIC, convert=True, resize=True):
+def get_resize_transform(opt, params=None, grayscale=True, method=Image.BICUBIC, convert=True, resize=True):
     transform_list = []
     transform_list.append(transforms.Grayscale(1))
     if resize:
