@@ -44,7 +44,7 @@ class LithoGANModel(BaseModel):
         if is_train:
             parser.set_defaults(gan_mode='wgangp')
             parser.add_argument('--lambda_attack', type=float, default=10.0, help='weight for F attack loss')
-            parser.add_argument('--grad_norm', type=bool, default=False, help='include gradient penalty for GAN training')
+            parser.add_argument('--grad_norm', type=bool, default=True, help='include gradient penalty for GAN training')
         return parser
 
     def __init__(self, opt):
@@ -169,17 +169,16 @@ class LithoGANModel(BaseModel):
         pred_real = self.netD(self.real_low_res)
         self.loss_D_real = self.criterionGAN(pred_real, True)
         self.loss_D = (self.loss_D_fake + self.loss_D_real) * 0.5
+        if self.opt.grad_norm:
+            self.loss_G_L1, _ = networks.cal_gradient_penalty(self.netD, self.real_low_res, self.fake.detach(), self.device)
+            self.loss_D += self.loss_G_L1
         self.loss_D.backward()
 
     def backward_G(self):
         """Calculate GAN and L1 loss for the generator"""
         pred_fake = self.netD(self.fake)
         self.loss_G_GAN = self.criterionGAN(pred_fake, True)
-        if self.opt.grad_norm:
-            self.loss_G_L1, _ = networks.cal_gradient_penalty(self.netD, self.real_low_res, self.fake, self.device)
-            self.loss_G = self.loss_G_GAN + self.loss_G_L1
-        else:
-            self.loss_G = self.loss_G_GAN
+        self.loss_G = self.loss_G_GAN
         if self.trainF:
             self.fake_resist = self.simulate(self.legal_fake)
             self.loss_F_attack = self.criterionLitho(self.fake_resist, self.fake_mask)
