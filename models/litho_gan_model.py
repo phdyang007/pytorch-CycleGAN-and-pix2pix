@@ -45,6 +45,7 @@ class LithoGANModel(BaseModel):
             parser.set_defaults(gan_mode='wgangp')
             parser.add_argument('--lambda_attack', type=float, default=10.0, help='weight for F attack loss')
             parser.add_argument('--grad_norm', type=bool, default=True, help='include gradient penalty for GAN training')
+            parser.add_argument('--ncritic', type=int, default=5, help='number of iterations to train critic')
         return parser
 
     def __init__(self, opt):
@@ -55,6 +56,7 @@ class LithoGANModel(BaseModel):
         """
         BaseModel.__init__(self, opt)
         self.trainGAN, self.trainF = opt.trainGAN, opt.trainF
+        self.ncritic = opt.ncritic
         assert self.trainGAN or self.trainF
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
         self.loss_names = []
@@ -198,23 +200,25 @@ class LithoGANModel(BaseModel):
     def optimize_parameters(self):
         # Iterative train GAN and F
         if self.trainGAN:
-            self.forward()
             if self.trainF:
                 self.set_requires_grad(self.netF, False) # Fix F when attacking
             # update D
             self.set_requires_grad(self.netD, True)  # enable backprop for D
-            self.optimizer_D.zero_grad()     # set D's gradients to zero
-            self.backward_D()                # calculate gradients for D
-            self.optimizer_D.step()          # update D's weights
+            for _ in range(self.ncritic):
+                self.forward()
+                self.optimizer_D.zero_grad()     # set D's gradients to zero
+                self.backward_D()                # calculate gradients for D
+                self.optimizer_D.step()          # update D's weights
             # update G
             self.set_requires_grad(self.netD, False)  # D requires no gradients when optimizing G
+            self.forward()
             self.optimizer_G.zero_grad()        # set G's gradients to zero
             self.backward_G()                   # calculate graidents for G
             self.optimizer_G.step()             # udpate G's weights
             
         if self.trainF:
-            self.forward()
             self.set_requires_grad(self.netF, True)
+            self.forward()
             self.optimizer_F.zero_grad()
             self.backward_F()
             self.optimizer_F.step()
