@@ -154,7 +154,7 @@ class LithoGANModel(BaseModel):
             self.foward_F()
 
     def forward_G(self):
-        noise = torch.randn(self.opt.batch_size, self.opt.input_zdim, 1, 1, device=self.device)
+        noise = torch.randn(self.real_low_res.shape[0], self.opt.input_zdim, 1, 1, device=self.device)
         self.fake = self.netG(noise)
         
     def forward_F(self):
