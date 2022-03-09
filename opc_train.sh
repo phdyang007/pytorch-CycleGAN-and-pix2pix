@@ -1,0 +1,2 @@
+#python3 train_lt.py --dataroot ./datasets/viav1 --name opc_unet_viav1 --netD n_layers --n_layers_D 3 --model opc --gpu_ids 4 --batch_size 4 --pool_size 25 --netG_A unet
+python3 train_lt.py --dataroot ./datasets/viav1 --name opc_oinnopc_viav1 --netD n_layers --n_layers_D 3 --model opc --gpu_ids 4 --batch_size 4 --pool_size 25 --netG_A oinnopc

@@ -86,6 +86,8 @@ class LithoTwinModel(BaseModel):
         if not self.isTrain:
             if self.opt.lt == False:
                 self.visual_names = ['real_A', 'fake_B', 'rec_C', 'nominal_C', 'inner_C', 'outer_C', 'real_B', 'fake_C','real_C']#, 'post_B', 'post_nominal_C', 'post_inner_C', 'post_outer_C']
+                if self.opt.dump_imask:
+                    self.visual_names + = ['fake_B_1','fake_B_2','fake_B_3','fake_B_4']
             else:
                 self.visual_names = ['real_A', 'fake_B', 'nominal_C']
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>.
@@ -230,6 +232,47 @@ class LithoTwinModel(BaseModel):
                 aerials = [nominal_aerial, inner_aerial, outer_aerial]
                 m = Metrics(self.real_A, aerials)
                 self.l2, self.pvb = m.get_all()
+                if self.opt.dump_imask:
+                    self.fake_B_1 = self.netG_A.x1 
+                    self.fake_B_2 = self.netG_A.x2 
+                    self.fake_B_3 = self.netG_A.x3 
+                    self.fake_B_4 = self.netG_A.x4 
+
+                    self.fake_B_1[self.fake_B_1>0.5]=1.0
+                    self.fake_B_1[self.fake_B_1<0.5]=0.0
+                    self.fake_B_2[self.fake_B_2>0.5]=1.0
+                    self.fake_B_2[self.fake_B_2<0.5]=0.0
+                    self.fake_B_3[self.fake_B_3>0.5]=1.0
+                    self.fake_B_3[self.fake_B_3<0.5]=0.0
+                    self.fake_B_4[self.fake_B_4>0.5]=1.0
+                    self.fake_B_4[self.fake_B_4<0.5]=0.0
+
+                    nominal_aerial, _   = self.cl.simulateImageOpt(self.fake_B_1, LITHO_KERNEL_FOCUS, NOMINAL_DOSE)
+                    outer_aerial, _     = self.cl.simulateImageOpt(self.fake_B_1, LITHO_KERNEL_FOCUS, MAX_DOSE)
+                    inner_aerial, _     = self.cl.simulateImageOpt(self.fake_B_1, LITHO_KERNEL_DEFOCUS, MIN_DOSE)                    
+                    aerials = [nominal_aerial, inner_aerial, outer_aerial]
+                    m = Metrics(self.real_A, aerials)
+                    self.l2_1, self.pvb_1 = m.get_all()
+                    nominal_aerial, _   = self.cl.simulateImageOpt(self.fake_B_2, LITHO_KERNEL_FOCUS, NOMINAL_DOSE)
+                    outer_aerial, _     = self.cl.simulateImageOpt(self.fake_B_2, LITHO_KERNEL_FOCUS, MAX_DOSE)
+                    inner_aerial, _     = self.cl.simulateImageOpt(self.fake_B_2, LITHO_KERNEL_DEFOCUS, MIN_DOSE)   
+                    aerials = [nominal_aerial, inner_aerial, outer_aerial]
+                    m = Metrics(self.real_A, aerials)
+                    self.l2_2, self.pvb_2 = m.get_all()
+                    nominal_aerial, _   = self.cl.simulateImageOpt(self.fake_B_3, LITHO_KERNEL_FOCUS, NOMINAL_DOSE)
+                    outer_aerial, _     = self.cl.simulateImageOpt(self.fake_B_3, LITHO_KERNEL_FOCUS, MAX_DOSE)
+                    inner_aerial, _     = self.cl.simulateImageOpt(self.fake_B_3, LITHO_KERNEL_DEFOCUS, MIN_DOSE)   
+                    aerials = [nominal_aerial, inner_aerial, outer_aerial]
+                    m = Metrics(self.real_A, aerials)
+                    self.l2_3, self.pvb_3 = m.get_all()
+                    nominal_aerial, _   = self.cl.simulateImageOpt(self.fake_B_4, LITHO_KERNEL_FOCUS, NOMINAL_DOSE)
+                    outer_aerial, _     = self.cl.simulateImageOpt(self.fake_B_4, LITHO_KERNEL_FOCUS, MAX_DOSE)
+                    inner_aerial, _     = self.cl.simulateImageOpt(self.fake_B_4, LITHO_KERNEL_DEFOCUS, MIN_DOSE)   
+                    aerials = [nominal_aerial, inner_aerial, outer_aerial]
+                    m = Metrics(self.real_A, aerials)
+                    self.l2_4, self.pvb_4 = m.get_all()
+
+
             else:
                 self.fake_B = self.netG_A(self.real_A)
                 self.fake_B[self.fake_B>0.5]=1.0

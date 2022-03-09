@@ -1,0 +1,1 @@
+python3 test_litho.py --dataroot ./datasets/iccad13dac22 --name litho_iccad13v1 --netD n_layers --n_layers_D 3 --model litho --gpu_ids 0 --batch_size 1 --lt_phase 1 --netG_B oinnlitho 

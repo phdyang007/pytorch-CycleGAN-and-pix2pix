@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
 
     designs = []
-    result = np.zeros((datanum, 10)).astype(float)
+    result = np.zeros(24).astype(float)
     
     
     name=    open(os.path.join(opt.results_dir, opt.name, "name.txt"), 'w')
@@ -97,24 +97,11 @@ if __name__ == '__main__':
         #if i % 5 == 0:  # save images to an HTML file
         print('processing (%04d)-th image... %s, runtime: %f' % (i, img_path[0], end-start))
 
-
-        if not opt.lt:
-            name.write(os.path.basename(img_path[0]))
-            name.write("\n")
-            result[i,0] = model.g_l2.cpu().detach().numpy()
-            result[i,1] = model.g_pvb.cpu().detach().numpy()
-            result[i,2] = model.l2_1.cpu().detach().numpy()
-            result[i,3] = model.pvb_1.cpu().detach().numpy()
-            result[i,4] = model.l2_2.cpu().detach().numpy()
-            result[i,5] = model.pvb_2.cpu().detach().numpy()
-            result[i,6] = model.l2_3.cpu().detach().numpy()
-            result[i,7] = model.pvb_3.cpu().detach().numpy()
-            result[i,8] = model.l2.cpu().detach().numpy()
-            result[i,9] = model.pvb.cpu().detach().numpy()
-
+        name.write(os.path.basename(img_path[0]))
+        name.write("\n")
+        result[i] = model.iou.cpu().detach().numpy()
 
         save_images(webpage, visuals, img_path, aspect_ratio=opt.aspect_ratio, width=opt.display_winsize, use_wandb=opt.use_wandb)
     webpage.save()  # save the HTML
     name.close()
-    if not opt.lt:
-        np.savetxt(os.path.join(opt.results_dir, opt.name, "result.csv"), result, delimiter=',')
+    np.savetxt(os.path.join(opt.results_dir, opt.name, "result.csv"), result, delimiter=',')
