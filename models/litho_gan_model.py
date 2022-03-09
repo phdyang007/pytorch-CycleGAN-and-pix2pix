@@ -160,8 +160,8 @@ class LithoGANModel(BaseModel):
     def forward_F(self):
         if self.trainGAN:
             self.legal_fake = self.legalize_mask(self.fake)
-            self.legal_fake_high_res = self.netG.upsample(self.legal_fak)
-            self.fake_mask = self.netF(self.legal_fake_high_res)    
+            self.legal_fake_high_res = self.netG.upsample(self.legal_fake)
+            self.fake_mask = self.netF(self.legal_fake_high_res) 
         self.real_mask = self.netF(self.real_high_res)
         
     def backward_D(self):

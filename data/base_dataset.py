@@ -9,7 +9,6 @@ from PIL import Image
 import torchvision.transforms as transforms
 from abc import ABC, abstractmethod
 
-
 class BaseDataset(data.Dataset, ABC):
     """This class is an abstract base class (ABC) for datasets.
 
@@ -77,7 +76,7 @@ def get_params(opt, size):
 
     return {'crop_pos': (x, y), 'flip': flip}
 
-def get_resize_transform(opt, params=None, grayscale=True, method=Image.BICUBIC, convert=True, resize=True):
+def get_resize_transform(opt, params=None, grayscale=True, method=transforms.InterpolationMode.BICUBIC, convert=True, resize=True):
     transform_list = []
     transform_list.append(transforms.Grayscale(1))
     if resize:

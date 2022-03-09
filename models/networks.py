@@ -846,7 +846,7 @@ class SpectralConv2dLiftChannel(nn.Module):
         print(x.shape)
         x_ft = torch.fft.rfft2(x).permute(0, 2, 3, 1) #N H W C
         print(x_ft.shape)
-        x_lift = self.liftchannel(x_ft)#.permute(0, 3, 1, 2) #N C H W
+        x_lift = self.liftchannel(x_ft).permute(0, 3, 1, 2) #N C H W
         print(x_lift.shape)
         # Multiply relevant Fourier modes
         out_ft = torch.zeros(batchsize, self.out_channels,  x.size(-2), x.size(-1)//2 + 1, dtype=torch.cfloat, device=x.device)
