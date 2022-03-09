@@ -22,9 +22,8 @@ class TestOptions(BaseOptions):
         parser.add_argument('--ilt_lr', type=float, default=10, help='learning rate for ILT mask post processing')
         parser.add_argument('--beta1', type=float, default=0.5, help='momentum term of adam')
 
+        parser.add_argument('--dump_imask', action='store_true', help='dump the intermediate mask in each doinn step, only for doinn multi.')  
 
-        #tmp opt inference on 8k image
-        parser.add_argument('--lt', action='store_true', help='inference on 8k tile')
         # rewrite devalue values
         #parser.set_defaults(model='test')
         # To avoid cropping, the load_size should be the same as crop_size

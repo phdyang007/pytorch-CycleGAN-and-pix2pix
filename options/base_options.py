@@ -61,6 +61,8 @@ class BaseOptions():
         parser.add_argument('--verbose', action='store_true', help='if specified, print more debugging information')
         parser.add_argument('--suffix', default='', type=str, help='customized suffix: opt.name = opt.name + suffix: e.g., {model}_{netG}_size{load_size}')
         parser.add_argument('--lt_phase', default=1, type=int, help='used to continue training or testing and select the phase for lithotwin, [0 pretrain G_A and G_B| 1 for lithotwin]')
+        #tmp opt inference on 8k image
+        parser.add_argument('--lt', action='store_true', help='inference on 8k tile')
         self.initialized = True
         return parser
 

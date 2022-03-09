@@ -54,7 +54,7 @@ def get_scheduler(optimizer, opt):
             return lr_l
         scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
     elif opt.lr_policy == 'step':
-        scheduler = lr_scheduler.StepLR(optimizer, step_size=opt.lr_decay_iters, gamma=0.1)
+        scheduler = lr_scheduler.StepLR(optimizer, step_size=opt.lr_decay_iters, gamma=0.5)
     elif opt.lr_policy == 'plateau':
         scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.2, threshold=0.01, patience=5)
     elif opt.lr_policy == 'cosine':
@@ -116,7 +116,7 @@ def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=[]):
     return net
 
 
-def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, init_type='normal', init_gain=0.02, gpu_ids=[]):
+def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, init_type='normal', init_gain=0.02, gpu_ids=[], train=True):
     """Create a generator
 
     Parameters:
@@ -145,7 +145,7 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
     """
     net = None
     norm_layer = get_norm_layer(norm_type=norm)
-
+    #print(netG)
     if netG == 'resnet_9blocks':
         net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9)
     elif netG == 'resnet_6blocks':
@@ -163,7 +163,11 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
     elif netG == 'oinnopc_large':
         net = oinnopc_large(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
     elif netG == 'oinnopc_multi':
-        net == oinnopc_multi(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
+        net = oinnopc_multi(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3, train=train)
+    elif netG == 'oinnopc_multi_v2':
+        net = oinnopc_multi_v2(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3, train=train)
+    elif netG == 'unet':
+        net = unet(1, 1, 3, 0.5)
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % netG)
     return init_net(net, init_type, init_gain, gpu_ids)
@@ -749,11 +753,11 @@ class SpectralConv2dLiftChannel(nn.Module):
     def forward(self, x):
         batchsize = x.shape[0]
         #Compute Fourier coeffcients up to factor of e^(- something constant)
-        print(x.shape)
+        #print(x.shape)
         x_ft = torch.fft.rfft2(x).permute(0, 2, 3, 1) #N H W C
-        print(x_ft.shape)
-        x_lift = self.liftchannel(x_ft)#.permute(0, 3, 1, 2) #N C H W
-        print(x_lift.shape)
+        #print(x_ft.shape)
+        x_lift = self.liftchannel(x_ft).permute(0, 3, 1, 2) #N C H W
+        #print(x_lift.shape)
         # Multiply relevant Fourier modes
         out_ft = torch.zeros(batchsize, self.out_channels,  x.size(-2), x.size(-1)//2 + 1, dtype=torch.cfloat, device=x.device)
         out_ft[:, :, :self.modes1, :self.modes2] = \
@@ -982,13 +986,96 @@ class NestedUNet(nn.Module):
             return output[:,:,12:-12,12:-12]
 
 
+class oinnopc_base(nn.Module): 
+    def __init__(self, modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3):
+        super(oinnopc_base, self).__init__()
 
+        # from design to mask, same as forward v2 as baseline.
+
+        self.modes1 = modes1
+        self.modes2 = modes2
+        self.width = width
+        self.refine_kernel = refine_kernel
+        self.in_channel = in_channel
+        self.refine_channel = refine_channel
+        self.smooth_kernel = smooth_kernel
+        #self.cemap = cemap
+        self.vgg_channels = [4,8,16,16,8,4]
+
+        #resize
+        self.resize0 = nn.AvgPool2d(8)
+        #fourier
+        self.fno = SpectralConv2dLiftChannel(self.in_channel, self.width, self.width, self.modes1, self.modes2)
+
+        #refine
+        self.convr0 = nn.Conv2d(in_channels=self.vgg_channels[5], out_channels=self.refine_channel, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr1 = nn.Conv2d(in_channels=self.refine_channel, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr2 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+
+        self.convr3 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=1, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.act_fn = nn.LeakyReLU(0.1)
+
+        #bypass unet
+        self.ds0 = PoolConv(1, self.vgg_channels[0])
+        self.vgg0 = VGGBlock(self.vgg_channels[0])
+        self.ds1 = PoolConv(self.vgg_channels[0], self.vgg_channels[1])
+        self.vgg1 = VGGBlock(self.vgg_channels[1])
+        self.ds2 = PoolConv(self.vgg_channels[1], self.vgg_channels[2])
+        self.vgg2 = VGGBlock(self.vgg_channels[2])   #250
+        self.us3 = UpConv(self.vgg_channels[2]+self.width, self.vgg_channels[3]) #merge with fno output
+        self.vgg3 = VGGBlock(self.vgg_channels[3])
+        self.us4 = UpConv(self.vgg_channels[3]+self.vgg_channels[1], self.vgg_channels[4])
+        self.vgg4 = VGGBlock(self.vgg_channels[4])
+        self.us5 = UpConv(self.vgg_channels[4]+self.vgg_channels[0], self.vgg_channels[5])
+        self.vgg5 = VGGBlock(self.vgg_channels[5])
+
+
+        self.tanh = nn.Tanh()
+        
+
+
+    def forward(self, x):
+
+        #fno pass
+        x_fno = self.resize0(x) 
+        #print(x_fno.shape)
+        x_fno = self.fno(x_fno)       
+        x_fno = self.act_fn(x_fno) 
+        #unet pass
+        x_unet = self.ds0(x)
+        x_unet_1000 = self.vgg0(x_unet)
+        x_unet = self.ds1(x_unet_1000)
+        x_unet_500 = self.vgg1(x_unet)
+        x_unet = self.ds2(x_unet_500)
+        x_unet_250 = self.vgg2(x_unet)
+
+        #merge fno and unet
+        x = torch.cat((x_fno, x_unet_250), 1)
+
+        #dconv
+        x = self.us3(x)
+        x = torch.cat((self.vgg3(x),x_unet_500), 1)
+        x = self.us4(x)
+        x = torch.cat((self.vgg4(x),x_unet_1000), 1)
+        x = self.us5(x)
+        x = self.vgg5(x)
+        #refine
+        x = self.convr0(x)
+        x = self.act_fn(x)
+        x = self.convr1(x)
+        x = self.act_fn(x)
+        x = self.convr2(x)
+        x = self.act_fn(x)
+        x = self.convr3(x)
+
+
+        return x
 
 
 
 class oinnopc_multi(nn.Module):
-    def __init__(self, modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3, oinn_num = 4):
-        super(oinnopc, self).__init__()
+    def __init__(self, modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3, oinn_num = 4, train=True):
+        super(oinnopc_multi, self).__init__()
 
         # from design to mask, four concatenated 
 
@@ -1000,15 +1087,35 @@ class oinnopc_multi(nn.Module):
         self.refine_channel = refine_channel
         self.smooth_kernel = smooth_kernel   
         self.oinn_num = oinn_num
-        self.layers = nn.Sequential()
-
-        for i in range(oinn_num):
-            self.layers.add_module("oinn%g"%(i+1), oinnopc(modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3))
+        self.tanh = nn.Tanh()
+        self.act_fn = nn.LeakyReLU(0.1)
+        self.oinn1 = oinnopc_base(modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3)
+        self.oinn2 = oinnopc_base(modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3)
+        self.oinn3 = oinnopc_base(modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3)
+        self.oinn4 = oinnopc_base(modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3)
+        self.train =train
 
     def forward(self, x): 
-        x = self.layers(x)
+        x1 = self.oinn1(x)
+        x1 = self.act_fn(x1) 
+        x2 = self.oinn2(x1) 
+        x2 = self.act_fn(x2) 
+        x3 = self.oinn3(x2) 
+        x3 = self.act_fn(x3) 
+        x4 = self.oinn4(x3) 
+        x4 = self.tanh(x4) 
 
-        return x 
+        self.x1 = x1
+        self.x2 = x2
+        self.x3 = x3
+        self.x4 = x4
+        if self.train:
+            return x4 
+        else:
+            return [x1,x2,x3,x4]
+
+
+
 
 
 
@@ -1068,7 +1175,7 @@ class oinnopc(nn.Module):
 
         #fno pass
         x_fno = self.resize0(x) 
-        print(x_fno.shape)
+        #print(x_fno.shape)
         x_fno = self.fno(x_fno)       
         x_fno = self.act_fn(x_fno) 
         #unet pass
@@ -1187,7 +1294,7 @@ class oinnopc_v001(nn.Module):
         return self.final(x)
 
 class oinnlitho(nn.Module): 
-    def __init__(self, modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3):
+    def __init__(self, modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 5, smooth_kernel = 3):
         super(oinnlitho, self).__init__()
 
         # from design to mask, same as forward v2 as baseline.
@@ -1341,10 +1448,13 @@ class oinnopc_large(nn.Module): #one fno unit only
         #print(x_fno.shape)
         #fno_size = x_fno.shape[-1]
         x_fnos=torch.zeros_like(x_fno).cuda().repeat(1, self.vgg_channels[2], 1, 1)
+        #print(x_fno.shape)
+        for i in range(5):
+            for j in range(5):
+                tmpx  = x_fno[:,:,i*128:i*128+256, j*128:j*128+256]
+                #print(tmpx.shape)
+                tmpfno = self.fno(tmpx)
 
-        for i in range(7):
-            for j in range(7):
-                tmpfno = self.fno(x_fno[:,:,i*128:i*128+256, j*128:j*128+256])
                 tmpfno = self.act_fn(tmpfno)
                 #print(tmpfno.shape)
                 x_fnos[:,:,i*128+64:i*128+192,j*128+64:j*128+192] = tmpfno[:,:,64:192,64:192]
@@ -1384,4 +1494,124 @@ class oinnopc_large(nn.Module): #one fno unit only
 
         return self.tanh(x)
 
+
+
+def conv(in_planes, output_channels, kernel_size, stride, dropout_rate):
+    return nn.Sequential(
+        nn.Conv2d(in_planes, output_channels, kernel_size=kernel_size,
+                  stride=stride, padding=(kernel_size - 1) // 2, bias = False),
+        nn.BatchNorm2d(output_channels),
+        nn.LeakyReLU(0.1, inplace=True),
+        nn.Dropout(dropout_rate)
+    )
+
+def deconv(input_channels, output_channels):
+    return nn.Sequential(
+        nn.ConvTranspose2d(input_channels, output_channels, kernel_size=4,
+                           stride=2, padding=1),
+        nn.LeakyReLU(0.1, inplace=True)
+    )
+
+def output_layer(input_channels, output_channels, kernel_size, stride, dropout_rate):
+    return nn.Conv2d(input_channels, output_channels, kernel_size=kernel_size,
+                     stride=stride, padding=(kernel_size - 1) // 2)
+
+
+#unet baseline
+class unet(nn.Module):
+    def __init__(self, input_channels, output_channels, kernel_size, dropout_rate):
+        super(unet, self).__init__()
+        self.input_channels = input_channels
+        self.conv1 = conv(input_channels, 64, kernel_size=kernel_size, stride=2, dropout_rate = dropout_rate)
+        self.conv2 = conv(64, 128, kernel_size=kernel_size, stride=2, dropout_rate = dropout_rate)
+        self.conv3 = conv(128, 256, kernel_size=kernel_size, stride=2, dropout_rate = dropout_rate)
+        self.conv3_1 = conv(256, 256, kernel_size=kernel_size, stride=1, dropout_rate = dropout_rate)
+        self.conv4 = conv(256, 512, kernel_size=kernel_size, stride=2, dropout_rate = dropout_rate)
+        self.conv4_1 = conv(512, 512, kernel_size=kernel_size, stride=1, dropout_rate = dropout_rate)
+        self.conv5 = conv(512, 1024, kernel_size=kernel_size, stride=2, dropout_rate = dropout_rate)
+        self.conv5_1 = conv(1024, 1024, kernel_size=kernel_size, stride=1, dropout_rate = dropout_rate)
+
+        self.deconv4 = deconv(1024, 256)
+        self.deconv3 = deconv(768, 128)
+        self.deconv2 = deconv(384, 64)
+        self.deconv1 = deconv(192, 32)
+        self.deconv0 = deconv(96, 16)
+    
+        self.output_layer = output_layer(16 + input_channels, output_channels, 
+                                         kernel_size=kernel_size, stride=1, dropout_rate = dropout_rate)
+
+
+    def forward(self, x):
+        out_conv1 = self.conv1(x)
+        out_conv2 = self.conv2(out_conv1)
+        out_conv3 = self.conv3_1(self.conv3(out_conv2))
+        out_conv4 = self.conv4_1(self.conv4(out_conv3))
+        out_conv5 = self.conv5_1(self.conv5(out_conv4))
+
+        out_deconv4 = self.deconv4(out_conv5)
+        #print(x.shape, out_conv1.shape, out_conv2.shape, out_conv3.shape, out_conv4.shape, out_deconv4.shape)
+        concat4 = torch.cat((out_conv4, out_deconv4), 1)
+        out_deconv3 = self.deconv3(concat4)
+        concat3 = torch.cat((out_conv3, out_deconv3), 1)
+        out_deconv2 = self.deconv2(concat3)
+        concat2 = torch.cat((out_conv2, out_deconv2), 1)
+        out_deconv1 = self.deconv1(concat2)
+        concat1 = torch.cat((out_conv1, out_deconv1), 1)
+        out_deconv0 = self.deconv0(concat1)
+        concat0 = torch.cat((x, out_deconv0), 1)
+        out = self.output_layer(concat0)
+        #print(out.shape)
+        return out
+
+
+
+
+#======loss funcs
+
+class LpLoss(object):
+    def __init__(self, d=2, p=2, size_average=True, reduction=True):
+        super(LpLoss, self).__init__()
+
+        #Dimension and Lp-norm type are postive
+        assert d > 0 and p > 0
+
+        self.d = d
+        self.p = p
+        self.reduction = reduction
+        self.size_average = size_average
+
+    def abs(self, x, y):
+        num_examples = x.size()[0]
+
+        #Assume uniform mesh
+        h = 1.0 / (x.size()[1] - 1.0)
+
+        all_norms = (h**(self.d/self.p))*torch.norm(x.view(num_examples,-1) - y.view(num_examples,-1), self.p, 1)
+
+        if self.reduction:
+            if self.size_average:
+                return torch.mean(all_norms)
+            else:
+                return torch.sum(all_norms)
+
+        return all_norms
+
+    def rel(self, x, y):
+        num_examples = x.size()[0]
+
+        diff_norms = torch.norm(x.reshape(num_examples,-1) - y.reshape(num_examples,-1), self.p, 1)
+        y_norms = torch.norm(y.reshape(num_examples,-1), self.p, 1)
+        pseudo_y_norms = torch.ones(num_examples).type('torch.cuda.FloatTensor') *250000.0
+        y_norms = torch.where(y_norms==0,pseudo_y_norms,y_norms)
+
+        if self.reduction:
+            if self.size_average:
+                return torch.mean(diff_norms/y_norms)
+            else:
+                return torch.sum(diff_norms/y_norms)
+
+        return diff_norms/y_norms
+
+    def __call__(self, x, y):
+        return self.rel(x, y)
 
