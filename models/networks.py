@@ -160,6 +160,8 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
         net = oinnlitho(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
     elif netG == 'oinnopc':
         net = oinnopc(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
+    elif netG == 'oinnopc_parallel':
+        net = oinnopc_parallel(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
     elif netG == 'oinnopc_v001':
         net = oinnopc_v001(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
     elif netG == 'oinnopc_large':
@@ -774,6 +776,54 @@ class PixelDiscriminator(nn.Module):
 ################################################################
 # fourier layer
 ################################################################
+class RealMul2d(nn.Module):
+    def __init__(self, in_channels, out_channels, modes1, modes2):
+        super(RealMul2d, self).__init__()
+        self.weight = nn.Parameter(torch.empty((in_channels, out_channels, modes1, modes2) ))  
+    def forward(self, x):
+        # x is real
+        return torch.einsum("bixy,ioxy->boxy", x, self.weight)
+    
+class ComplexMul2d(nn.Module):
+    def __init__(self, in_channels, out_channels, modes1, modes2):
+        super(RealMul2d, self).__init__()
+        self.weight = nn.Parameter(torch.empty((in_channels, out_channels, modes1, modes2), dtype=torch.complex64 )) 
+    def forward(self, x):
+        # x is real
+        return torch.einsum("bixy,ioxy->boxy", x, self.weight)
+    
+class ComplexMul2dParallel(nn.Module):
+    def __init__(self, in_channels, out_channels, modes1, modes2):
+        # (A+Bi)*(R+Ii) = (AR-BI) + (AI+BR)i
+        super(ComplexMul2dParallel, self).__init__()
+        self.A = RealMul2d(in_channels, out_channels, modes1, modes2)
+        self.B = RealMul2d(in_channels, out_channels, modes1, modes2)
+    def forward(self, input):
+        # input is complex
+        real = self.A(input.real) - self.B(input.imag)
+        imag = self.A(input.imag) + self.B(input.real)
+        return real.type(torch.complex64) + 1j*imag.type(torch.complex64)
+    
+class ComplexLinear(nn.Module):
+    def __init__(self, in_features, out_features):
+        super(ComplexLinear, self).__init__()
+        self.model = nn.Linear(self.in_channel, width, dtype=torch.complex64)
+    def forward(self, input):
+        # input is complex
+        return self.model(input)
+    
+class ComplexLinearParallel(nn.Module):
+    def __init__(self, in_features, out_features):
+        super(ComplexLinearParallel, self).__init__()
+        self.fc_r = nn.Linear(in_features, out_features)
+        self.fc_i = nn.Linear(in_features, out_features)
+    def apply_complex(self, fr, fi, input, dtype=torch.complex64):
+         return (fr(input.real)-fi(input.imag)).type(dtype) \
+            + 1j*(fr(input.imag)+fi(input.real)).type(dtype)
+    def forward(self, input):
+        # input is complex
+        return self.apply_complex(self.fc_r, self.fc_i, input)
+
 class SpectralConv2d(nn.Module):
     def __init__(self, in_channels, out_channels, modes1, modes2):
         super(SpectralConv2d, self).__init__()
@@ -788,13 +838,8 @@ class SpectralConv2d(nn.Module):
         self.modes2 = modes2
 
         self.scale = (1 / (in_channels * out_channels))
-        self.weights1 = nn.Parameter(self.scale * torch.rand(in_channels, out_channels, self.modes1, self.modes2, dtype=torch.cfloat))
-        self.weights2 = nn.Parameter(self.scale * torch.rand(in_channels, out_channels, self.modes1, self.modes2, dtype=torch.cfloat))
-
-    # Complex multiplication
-    def compl_mul2d(self, input, weights):
-        # (batch, in_channel, x,y ), (in_channel, out_channel, x,y) -> (batch, out_channel, x,y)
-        return torch.einsum("bixy,ioxy->boxy", input, weights)
+        self.matmul1 = ComplexMul2d(in_channels, out_channels, modes1, modes2)
+        self.matmul2 = ComplexMul2d(in_channels, out_channels, modes1, modes2)
 
     def forward(self, x):
         batchsize = x.shape[0]
@@ -803,16 +848,43 @@ class SpectralConv2d(nn.Module):
 
         # Multiply relevant Fourier modes
         out_ft = torch.zeros(batchsize, self.out_channels,  x.size(-2), x.size(-1)//2 + 1, dtype=torch.cfloat, device=x.device)
-        out_ft[:, :, :self.modes1, :self.modes2] = \
-            self.compl_mul2d(x_ft[:, :, :self.modes1, :self.modes2], self.weights1)
-        out_ft[:, :, -self.modes1:, :self.modes2] = \
-            self.compl_mul2d(x_ft[:, :, -self.modes1:, :self.modes2], self.weights2)
+        out_ft[:, :, :self.modes1, :self.modes2] = self.matmul1(x_ft[:, :, :self.modes1, :self.modes2])
+        out_ft[:, :, -self.modes1:, :self.modes2] = self.matmul2(x_ft[:, :, -self.modes1:, :self.modes2])
 
         #Return to physical space
         x = torch.fft.irfft2(out_ft, s=(x.size(-2), x.size(-1)))
         return x
 
+class SpectralConv2dParallel(nn.Module):
+    def __init__(self, in_channels, out_channels, modes1, modes2):
+        super(SpectralConv2dParallel, self).__init__()
 
+        """
+        2D Fourier layer. It does FFT, linear transform, and Inverse FFT.    
+        """
+
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.modes1 = modes1 #Number of Fourier modes to multiply, at most floor(N/2) + 1
+        self.modes2 = modes2
+
+        self.scale = (1 / (in_channels * out_channels))
+        self.matmul1 = ComplexMul2dParallel(in_channels, out_channels, modes1, modes2)
+        self.matmul2 = ComplexMul2dParallel(in_channels, out_channels, modes1, modes2)
+
+    def forward(self, x):
+        batchsize = x.shape[0]
+        #Compute Fourier coeffcients up to factor of e^(- something constant)
+        x_ft = torch.fft.rfft2(x)
+
+        # Multiply relevant Fourier modes
+        out_ft = torch.zeros(batchsize, self.out_channels,  x.size(-2), x.size(-1)//2 + 1, dtype=torch.cfloat, device=x.device)
+        out_ft[:, :, :self.modes1, :self.modes2] = self.matmul1(x_ft[:, :, :self.modes1, :self.modes2])
+        out_ft[:, :, -self.modes1:, :self.modes2] = self.matmul2(x_ft[:, :, -self.modes1:, :self.modes2])
+
+        #Return to physical space
+        x = torch.fft.irfft2(out_ft, s=(x.size(-2), x.size(-1)))
+        return x
 
 
 
@@ -835,14 +907,9 @@ class SpectralConv2dLiftChannel(nn.Module):
         self.modes2 = modes2
 
         self.scale = (1 / (self.width * out_channels))
-        self.weights1 = nn.Parameter(self.scale * torch.rand(self.width, out_channels, self.modes1, self.modes2, dtype=torch.cfloat))
-        self.weights2 = nn.Parameter(self.scale * torch.rand(self.width, out_channels, self.modes1, self.modes2, dtype=torch.cfloat))
-        self.liftchannel = nn.Linear(self.in_channel, width, dtype=torch.cfloat)
-
-    # Complex multiplication
-    def compl_mul2d(self, input, weights):
-        # (batch, in_channel, x,y ), (in_channel, out_channel, x,y) -> (batch, out_channel, x,y)
-        return torch.einsum("bixy,ioxy->boxy", input, weights)
+        self.matmul1 = ComplexMul2d(self.width, out_channels, modes1, modes2)
+        self.matmul2 = ComplexMul2d(self.width, out_channels, modes1, modes2)
+        self.liftchannel = ComplexLinear(self.in_channel, width) #nn.Linear(self.in_channel, width)#, dtype=torch.cfloat)
 
     def forward(self, x):
         batchsize = x.shape[0]
@@ -854,16 +921,49 @@ class SpectralConv2dLiftChannel(nn.Module):
         #print(x_lift.shape)
         # Multiply relevant Fourier modes
         out_ft = torch.zeros(batchsize, self.out_channels,  x.size(-2), x.size(-1)//2 + 1, dtype=torch.cfloat, device=x.device)
-        out_ft[:, :, :self.modes1, :self.modes2] = \
-            self.compl_mul2d(x_lift[:, :, :self.modes1, :self.modes2], self.weights1)
-        out_ft[:, :, -self.modes1:, :self.modes2] = \
-            self.compl_mul2d(x_lift[:, :, -self.modes1:, :self.modes2], self.weights2)
+        out_ft[:, :, :self.modes1, :self.modes2] = self.matmul1(x_lift[:, :, :self.modes1, :self.modes2])
+        out_ft[:, :, -self.modes1:, :self.modes2] = self.matmul2(x_lift[:, :, -self.modes1:, :self.modes2])
 
         #Return to physical space
         x = torch.fft.irfft2(out_ft, s=(x.size(-2), x.size(-1)))
         return x
 
+class SpectralConv2dLiftChannelParallel(nn.Module):
+    def __init__(self, in_channel, width, out_channels, modes1, modes2):
+        super(SpectralConv2dLiftChannelParallel, self).__init__()
 
+        """
+        2D Fourier layer. It does FFT, linear transform, and Inverse FFT.    
+        lift in_channel to width after fft
+        """
+
+        self.in_channel = in_channel
+        self.width = width 
+        self.out_channels = out_channels
+        self.modes1 = modes1 #Number of Fourier modes to multiply, at most floor(N/2) + 1
+        self.modes2 = modes2
+
+        self.scale = (1 / (self.width * out_channels))
+        self.matmul1 = ComplexMul2dParallel(self.width, out_channels, modes1, modes2)
+        self.matmul2 = ComplexMul2dParallel(self.width, out_channels, modes1, modes2)
+        self.liftchannel = ComplexLinearParallel(self.in_channel, width) #nn.Linear(self.in_channel, width)#, dtype=torch.cfloat)
+
+    def forward(self, x):
+        batchsize = x.shape[0]
+        #Compute Fourier coeffcients up to factor of e^(- something constant)
+        #print(x.shape)
+        x_ft = torch.fft.rfft2(x).permute(0, 2, 3, 1) #N H W C
+        #print(x_ft.shape)
+        x_lift = self.liftchannel(x_ft).permute(0, 3, 1, 2) #N C H W
+        #print(x_lift.shape)
+        # Multiply relevant Fourier modes
+        out_ft = torch.zeros(batchsize, self.out_channels,  x.size(-2), x.size(-1)//2 + 1, dtype=torch.cfloat, device=x.device)
+        out_ft[:, :, :self.modes1, :self.modes2] = self.matmul1(x_lift[:, :, :self.modes1, :self.modes2])
+        out_ft[:, :, -self.modes1:, :self.modes2] = self.matmul2(x_lift[:, :, -self.modes1:, :self.modes2])
+
+        #Return to physical space
+        x = torch.fft.irfft2(out_ft, s=(x.size(-2), x.size(-1)))
+        return x
 
 
 class VGGBlock(nn.Module):
@@ -1209,7 +1309,90 @@ class oinnopc_multi(nn.Module):
 
 
 
+class oinnopc_parallel(nn.Module): 
+    def __init__(self, modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3):
+        super(oinnopc_parallel, self).__init__()
 
+        # from design to mask, same as forward v2 as baseline.
+
+        self.modes1 = modes1
+        self.modes2 = modes2
+        self.width = width
+        self.refine_kernel = refine_kernel
+        self.in_channel = in_channel
+        self.refine_channel = refine_channel
+        self.smooth_kernel = smooth_kernel
+        #self.cemap = cemap
+        self.vgg_channels = [4,8,16,16,8,4]
+
+        #resize
+        self.resize0 = nn.AvgPool2d(8)
+        #fourier
+        self.fno = SpectralConv2dLiftChannelParallel(self.in_channel, self.width, self.width, self.modes1, self.modes2)
+
+        #refine
+        self.convr0 = nn.Conv2d(in_channels=self.vgg_channels[5], out_channels=self.refine_channel, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr1 = nn.Conv2d(in_channels=self.refine_channel, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr2 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+
+        self.convr3 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=1, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.act_fn = nn.LeakyReLU(0.1)
+
+        #bypass unet
+        self.ds0 = PoolConv(1, self.vgg_channels[0])
+        self.vgg0 = VGGBlock(self.vgg_channels[0])
+        self.ds1 = PoolConv(self.vgg_channels[0], self.vgg_channels[1])
+        self.vgg1 = VGGBlock(self.vgg_channels[1])
+        self.ds2 = PoolConv(self.vgg_channels[1], self.vgg_channels[2])
+        self.vgg2 = VGGBlock(self.vgg_channels[2])   #250
+        self.us3 = UpConv(self.vgg_channels[2]+self.width, self.vgg_channels[3]) #merge with fno output
+        self.vgg3 = VGGBlock(self.vgg_channels[3])
+        self.us4 = UpConv(self.vgg_channels[3]+self.vgg_channels[1], self.vgg_channels[4])
+        self.vgg4 = VGGBlock(self.vgg_channels[4])
+        self.us5 = UpConv(self.vgg_channels[4]+self.vgg_channels[0], self.vgg_channels[5])
+        self.vgg5 = VGGBlock(self.vgg_channels[5])
+
+
+        self.tanh = nn.Tanh()
+        
+
+
+    def forward(self, x):
+
+        #fno pass
+        x_fno = self.resize0(x) 
+        #print(x_fno.shape)
+        x_fno = self.fno(x_fno)       
+        x_fno = self.act_fn(x_fno) 
+        #unet pass
+        x_unet = self.ds0(x)
+        x_unet_1000 = self.vgg0(x_unet)
+        x_unet = self.ds1(x_unet_1000)
+        x_unet_500 = self.vgg1(x_unet)
+        x_unet = self.ds2(x_unet_500)
+        x_unet_250 = self.vgg2(x_unet)
+
+        #merge fno and unet
+        x = torch.cat((x_fno, x_unet_250), 1)
+
+        #dconv
+        x = self.us3(x)
+        x = torch.cat((self.vgg3(x),x_unet_500), 1)
+        x = self.us4(x)
+        x = torch.cat((self.vgg4(x),x_unet_1000), 1)
+        x = self.us5(x)
+        x = self.vgg5(x)
+        #refine
+        x = self.convr0(x)
+        x = self.act_fn(x)
+        x = self.convr1(x)
+        x = self.act_fn(x)
+        x = self.convr2(x)
+        x = self.act_fn(x)
+        x = self.convr3(x)
+
+
+        return self.tanh(x)
 
 
 

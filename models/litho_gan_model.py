@@ -37,7 +37,7 @@ class LithoGANModel(BaseModel):
         """
         # changing the default values to match the pix2pix paper (https://phillipi.github.io/pix2pix/)
         parser.set_defaults(netG='dcgan', netD='dcgan')
-        parser.add_argument('--netF', type=str, default='oinnopc', help='specify litho architecture [oinnopc]')
+        parser.add_argument('--netF', type=str, default='oinnopc_parallel', help='specify litho architecture [oinnopc]')
         parser.add_argument('--trainGAN', type=bool, default=False, help='whether to include GAN model for train/test')
         parser.add_argument('--trainF', type=bool, default=True, help='whether to include F model')
         parser.add_argument('--input_zdim', type=int, default=128, help='input Z dimension to GAN')
@@ -138,7 +138,7 @@ class LithoGANModel(BaseModel):
     def simulate(self, mask):
         """Call litho simulator with input legal masks
         """
-        for id in range(mask[0]):
+        for id in range(mask.shape[0]):
             if id == 0:
                 _, resist = self.cl.simulateImageOpt(torch.unsqueeze(mask[id],0), LITHO_KERNEL_FOCUS, NOMINAL_DOSE)
             else:
