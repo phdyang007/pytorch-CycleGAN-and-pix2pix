@@ -37,7 +37,7 @@ class LithoGANModel(BaseModel):
         """
         # changing the default values to match the pix2pix paper (https://phillipi.github.io/pix2pix/)
         parser.set_defaults(netG='dcgan', netD='dcgan')
-        parser.add_argument('--netF', type=str, default='oinnopc_parallel', help='specify litho architecture [oinnopc]')
+        parser.add_argument('--netF', type=str, default='oinnopc', help='specify litho architecture [oinnopc]')
         parser.add_argument('--trainGAN', type=bool, default=False, help='whether to include GAN model for train/test')
         parser.add_argument('--trainF', type=bool, default=True, help='whether to include F model')
         parser.add_argument('--input_zdim', type=int, default=128, help='input Z dimension to GAN')

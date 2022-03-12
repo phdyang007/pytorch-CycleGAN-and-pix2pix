@@ -786,7 +786,7 @@ class RealMul2d(nn.Module):
     
 class ComplexMul2d(nn.Module):
     def __init__(self, in_channels, out_channels, modes1, modes2):
-        super(RealMul2d, self).__init__()
+        super(ComplexMul2d, self).__init__()
         self.weight = nn.Parameter(torch.empty((in_channels, out_channels, modes1, modes2), dtype=torch.complex64 )) 
     def forward(self, x):
         # x is real
@@ -807,7 +807,7 @@ class ComplexMul2dParallel(nn.Module):
 class ComplexLinear(nn.Module):
     def __init__(self, in_features, out_features):
         super(ComplexLinear, self).__init__()
-        self.model = nn.Linear(self.in_channel, width, dtype=torch.complex64)
+        self.model = nn.Linear(in_features, out_features, dtype=torch.complex64)
     def forward(self, input):
         # input is complex
         return self.model(input)
