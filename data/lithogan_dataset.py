@@ -38,13 +38,13 @@ class LithoGANDataset(BaseDataset):
         """
         Image.MAX_IMAGE_PIXELS = 301326592
         # read a image given a random integer index
-        high_res = self.high_res[index]
-        high_res = Image.open(high_res).convert('L')
+        high_res_path = self.high_res[index]
+        high_res = Image.open(high_res_path).convert('L')
         high_res_transform = get_resize_transform(self.opt, grayscale=True, convert=True, resize=False)
         low_res_transform = get_resize_transform(self.opt, grayscale=True, convert=True, resize=True)
         real_high_res = high_res_transform(high_res)
         real_low_res = low_res_transform(high_res)
-        return {'real_high_res': real_high_res, 'real_low_res': real_low_res}
+        return {'real_high_res': real_high_res, 'real_low_res': real_low_res, 'image_paths':high_res_path}
 
     def __len__(self):
         """Return the total number of images in the dataset."""

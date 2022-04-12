@@ -32,6 +32,8 @@ from data import create_dataset
 from models import create_model
 from util.visualizer import save_images
 from util import html
+import torch
+import numpy as np
 
 try:
     import wandb
@@ -67,14 +69,29 @@ if __name__ == '__main__':
     # For [CycleGAN]: It should not affect CycleGAN as CycleGAN uses instancenorm without dropout.
     if opt.eval:
         model.eval()
+    print(len(dataset))
+    result = np.zeros((min(len(dataset), opt.num_test),2)).astype(float)
+    names = []
     for i, data in enumerate(dataset):
         if i >= opt.num_test:  # only apply our model to opt.num_test images.
             break
         model.set_input(data)  # unpack data from data loader
+        true_ground = model.real_high_res[:,:,:,2048*2:]
+        model.real_high_res = model.real_high_res[:,:,:,:2048]
+        print(model.real_high_res.shape)
         model.test()           # run inference
+        with torch.no_grad():
+            a, b = model.get_F_criterion(true_ground)
+            result[i,0], result[i,1] = a.cpu().detach().numpy(), b.cpu().detach().numpy()
         visuals = model.get_current_visuals()  # get image results
-        img_path = model.get_image_paths()     # get image paths
-        if i % 5 == 0:  # save images to an HTML file
+        img_path = model.get_image_paths()   # get image paths
+        names.append(img_path)
+        if i % 500 == 0:  # save images to an HTML file
             print('processing (%04d)-th image... %s' % (i, img_path))
         save_images(webpage, visuals, img_path, aspect_ratio=opt.aspect_ratio, width=opt.display_winsize, use_wandb=opt.use_wandb)
+    print(result.mean(axis=0))
+    #print(result)
+    print(result.min(axis=0))
+    idx = result.argmin(axis=0)[1]
+    print(names[idx])
     webpage.save()  # save the HTML

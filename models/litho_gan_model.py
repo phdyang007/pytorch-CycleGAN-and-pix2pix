@@ -56,7 +56,8 @@ class LithoGANModel(BaseModel):
         """
         BaseModel.__init__(self, opt)
         self.trainGAN, self.trainF = opt.trainGAN, opt.trainF
-        self.ncritic = opt.ncritic
+        if self.isTrain:
+            self.ncritic = opt.ncritic
         assert self.trainGAN or self.trainF
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
         self.loss_names = []
@@ -109,8 +110,10 @@ class LithoGANModel(BaseModel):
                 self.optimizer_F = torch.optim.Adam(self.netF.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
                 self.optimizers.append(self.optimizer_F)
                 
-                self.kernel = Kernel()
-                self.cl = CUDA_LITHO(self.kernel)
+        if self.trainF:
+            self.kernel = Kernel()
+            self.cl = CUDA_LITHO(self.kernel)
+            self.criterionLitho = torch.nn.MSELoss()
 
     def set_input(self, input):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
@@ -122,17 +125,18 @@ class LithoGANModel(BaseModel):
         """
         self.real_low_res = input['real_low_res'].to(self.device)
         self.real_high_res = input['real_high_res'].to(self.device)
+        self.image_paths = input['image_paths']
         
-    def legalize_mask(self, mask):
+    def legalize_mask(self, mask, threshold=0.5):
         """Legalize the mask generated from GAN."""
-        mask[mask >= 0.5] = 1
-        mask[mask < 0.5] = 0
+        mask[mask >= threshold] = 1
+        mask[mask < threshold] = 0
         return mask
     
     def legalize_resist(self, resist):
         """Legalize the resist from litho simulator."""
         resist[resist >= 0.225] = 1.0
-        resist[resist < 0.225] = 0.0
+        resist[resist < 0.225] = -1.0
         return resist
     
     def simulate(self, mask):
@@ -196,7 +200,23 @@ class LithoGANModel(BaseModel):
             self.loss_F_fake = self.criterionLitho(self.fake_resist, self.fake_mask)
             self.loss_F += self.loss_F_fake
         self.loss_F.backward()
-            
+        
+    def get_F_criterion(self, real=None):
+        if real != None:
+            self.real_resist = real
+        else:
+            self.real_resist = self.simulate(self.real_high_res)
+            self.real_resist = self.legalize_mask(self.real_resist, 0.0)
+        loss = self.criterionLitho(self.real_resist, self.real_mask)  
+        self.real_mask = self.legalize_mask(self.real_mask, 0.0).int()
+        self.real_resist = self.real_resist.int()
+        intersection_fg = (self.real_mask & self.real_resist).float()
+        union_fg = (self.real_mask | self.real_resist).float()
+        self.iou_fg = intersection_fg.sum()/union_fg.sum()
+        self.iou_bg = (1-union_fg).sum()/(1-intersection_fg).sum()
+        self.iou = (self.iou_bg + self.iou_fg)/2.0
+        return loss, self.iou
+    
     def optimize_parameters(self):
         # Iterative train GAN and F
         if self.trainGAN:
