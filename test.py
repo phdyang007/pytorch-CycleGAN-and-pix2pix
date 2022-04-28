@@ -81,7 +81,7 @@ if __name__ == '__main__':
         print(model.real_high_res.shape)
         model.test()           # run inference
         with torch.no_grad():
-            a, b = model.get_F_criterion(true_ground)
+            a, b = model.get_F_criterion(None)
             result[i,0], result[i,1] = a.cpu().detach().numpy(), b.cpu().detach().numpy()
         visuals = model.get_current_visuals()  # get image results
         img_path = model.get_image_paths()   # get image paths

@@ -160,6 +160,8 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
         net = oinnlitho(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
     elif netG == 'oinnopc':
         net = oinnopc(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
+    elif netG == 'oinnopc_seg':
+        net =  oinnopc_seg(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
     elif netG == 'oinnopc_parallel':
         net = oinnopc_parallel(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
     elif netG == 'oinnopc_v001':
@@ -1891,3 +1893,82 @@ class LpLoss(object):
     def __call__(self, x, y):
         return self.rel(x, y)
 
+class oinnopc_seg(nn.Module): 
+    # difference between oinnopc model. Output logits prior to tanh activation. Final output dual channel 2*res*res for segmentation
+    
+    def __init__(self, modes1, modes2,  width, in_channel=1, refine_channel=32, refine_kernel = 3, smooth_kernel = 3):
+        super(oinnopc_seg, self).__init__()
+
+        # from design to mask, same as forward v2 as baseline.
+
+        self.modes1 = modes1
+        self.modes2 = modes2
+        self.width = width
+        self.refine_kernel = refine_kernel
+        self.in_channel = in_channel
+        self.refine_channel = refine_channel
+        self.smooth_kernel = smooth_kernel
+        #self.cemap = cemap
+        self.vgg_channels = [4,8,16,16,8,4]
+
+        #resize
+        self.resize0 = nn.AvgPool2d(8)
+        #fourier
+        self.fno = SpectralConv2dLiftChannel(self.in_channel, self.width, self.width, self.modes1, self.modes2)
+
+        #refine
+        self.convr0 = nn.Conv2d(in_channels=self.vgg_channels[5], out_channels=self.refine_channel, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr1 = nn.Conv2d(in_channels=self.refine_channel, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr2 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+
+        self.convr3 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.act_fn = nn.LeakyReLU(0.1)
+
+        #bypass unet
+        self.ds0 = PoolConv(1, self.vgg_channels[0])
+        self.vgg0 = VGGBlock(self.vgg_channels[0])
+        self.ds1 = PoolConv(self.vgg_channels[0], self.vgg_channels[1])
+        self.vgg1 = VGGBlock(self.vgg_channels[1])
+        self.ds2 = PoolConv(self.vgg_channels[1], self.vgg_channels[2])
+        self.vgg2 = VGGBlock(self.vgg_channels[2])   #250
+        self.us3 = UpConv(self.vgg_channels[2]+self.width, self.vgg_channels[3]) #merge with fno output
+        self.vgg3 = VGGBlock(self.vgg_channels[3])
+        self.us4 = UpConv(self.vgg_channels[3]+self.vgg_channels[1], self.vgg_channels[4])
+        self.vgg4 = VGGBlock(self.vgg_channels[4])
+        self.us5 = UpConv(self.vgg_channels[4]+self.vgg_channels[0], self.vgg_channels[5])
+        self.vgg5 = VGGBlock(self.vgg_channels[5])
+        
+    def forward(self, x):
+
+        #fno pass
+        x_fno = self.resize0(x) 
+        #print(x_fno.shape)
+        x_fno = self.fno(x_fno)       
+        x_fno = self.act_fn(x_fno) 
+        #unet pass
+        x_unet = self.ds0(x)
+        x_unet_1000 = self.vgg0(x_unet)
+        x_unet = self.ds1(x_unet_1000)
+        x_unet_500 = self.vgg1(x_unet)
+        x_unet = self.ds2(x_unet_500)
+        x_unet_250 = self.vgg2(x_unet)
+
+        #merge fno and unet
+        x = torch.cat((x_fno, x_unet_250), 1)
+
+        #dconv
+        x = self.us3(x)
+        x = torch.cat((self.vgg3(x),x_unet_500), 1)
+        x = self.us4(x)
+        x = torch.cat((self.vgg4(x),x_unet_1000), 1)
+        x = self.us5(x)
+        x = self.vgg5(x)
+        #refine
+        x = self.convr0(x)
+        x = self.act_fn(x)
+        x = self.convr1(x)
+        x = self.act_fn(x)
+        x = self.convr2(x)
+        x = self.act_fn(x)
+        x = self.convr3(x)
+        return x

@@ -37,7 +37,7 @@ class LithoGANModel(BaseModel):
         """
         # changing the default values to match the pix2pix paper (https://phillipi.github.io/pix2pix/)
         parser.set_defaults(netG='dcgan', netD='dcgan')
-        parser.add_argument('--netF', type=str, default='oinnopc', help='specify litho architecture [oinnopc]')
+        parser.add_argument('--netF', type=str, default='oinnopc_seg', help='specify litho architecture [oinnopc]')
         parser.add_argument('--trainGAN', type=bool, default=False, help='whether to include GAN model for train/test')
         parser.add_argument('--trainF', type=bool, default=True, help='whether to include F model')
         parser.add_argument('--input_zdim', type=int, default=128, help='input Z dimension to GAN')
@@ -77,7 +77,7 @@ class LithoGANModel(BaseModel):
         if self.trainF:
             self.model_names.append('F')
             self.loss_names.append('F_real')
-            self.visual_names.append('real_mask')
+            self.visual_names.append('real_mask_img')
             self.visual_names.append('real_resist')
             if self.trainGAN:
                 self.loss_names.append('F_fake')
@@ -99,7 +99,8 @@ class LithoGANModel(BaseModel):
         if self.isTrain:
             # define loss functions
             self.criterionGAN = networks.GANLoss(opt.gan_mode).to(self.device)
-            self.criterionLitho = torch.nn.MSELoss()
+            self.criterionLitho = torch.nn.CrossEntropyLoss()
+            #self.criterionLitho = torch.nn.MSELoss()
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             if self.trainGAN:
                 self.optimizer_G = torch.optim.Adam(self.netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
@@ -113,7 +114,7 @@ class LithoGANModel(BaseModel):
         if self.trainF:
             self.kernel = Kernel()
             self.cl = CUDA_LITHO(self.kernel)
-            self.criterionLitho = torch.nn.MSELoss()
+            self.criterionLitho = torch.nn.CrossEntropyLoss()
 
     def set_input(self, input):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
@@ -135,8 +136,8 @@ class LithoGANModel(BaseModel):
     
     def legalize_resist(self, resist):
         """Legalize the resist from litho simulator."""
-        resist[resist >= 0.225] = 1.0
-        resist[resist < 0.225] = -1.0
+        resist[resist >= 0.225] = 1  # prior was 1 vs -1
+        resist[resist < 0.225] = 0
         return resist
     
     def simulate(self, mask):
@@ -149,6 +150,10 @@ class LithoGANModel(BaseModel):
                 _, tmp = self.cl.simulateImageOpt(torch.unsqueeze(mask[id],0), LITHO_KERNEL_FOCUS, NOMINAL_DOSE)
                 resist = torch.cat((resist, tmp), dim=0)
         return self.legalize_resist(resist)
+    
+    def to_one_hot(self, x):
+        x = x.squeeze(1).to(torch.int64)
+        return torch.nn.functional.one_hot(x,num_classes=2).permute((0,3,1,2)).float()
     
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
@@ -167,6 +172,13 @@ class LithoGANModel(BaseModel):
             self.legal_fake_high_res = self.netG.upsample(self.legal_fake)
             self.fake_mask = self.netF(self.legal_fake_high_res) 
         self.real_mask = self.netF(self.real_high_res)
+        self.real_mask_img = torch.argmax(self.real_mask, dim=1, keepdim=True)
+        
+    def forward_attack(self):
+        self.forward_F()
+        self.real_resist = self.simulate(self.real_high_res)
+        self.loss_F = self.criterionLitho(self.real_mask, self.to_one_hot(self.real_resist))  
+        return self.loss_F
         
     def backward_D(self):
         """Calculate GAN loss for the discriminator"""
@@ -193,7 +205,7 @@ class LithoGANModel(BaseModel):
         
     def backward_F(self):
         self.real_resist = self.simulate(self.real_high_res)
-        self.loss_F_real = self.criterionLitho(self.real_resist, self.real_mask)  
+        self.loss_F_real = self.criterionLitho(self.real_mask, self.to_one_hot(self.real_resist))  
         self.loss_F = self.loss_F_real 
         if self.trainGAN:
             self.fake_resist = self.simulate(self.legal_fake)
@@ -206,9 +218,9 @@ class LithoGANModel(BaseModel):
             self.real_resist = real
         else:
             self.real_resist = self.simulate(self.real_high_res)
-            self.real_resist = self.legalize_mask(self.real_resist, 0.0)
-        loss = self.criterionLitho(self.real_resist, self.real_mask)  
-        self.real_mask = self.legalize_mask(self.real_mask, 0.0).int()
+            self.real_resist = self.legalize_mask(self.real_resist, 0.5)
+        loss = self.criterionLitho(self.real_mask, self.to_one_hot(self.real_resist)) 
+        self.real_mask = self.legalize_mask(self.real_mask_img, 0.5).int()
         self.real_resist = self.real_resist.int()
         intersection_fg = (self.real_mask & self.real_resist).float()
         union_fg = (self.real_mask | self.real_resist).float()
