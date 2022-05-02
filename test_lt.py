@@ -33,6 +33,8 @@ from models import create_model
 from util.visualizer import save_images
 from util import html
 from datetime import datetime
+import numpy as np 
+import cv2
 
 try:
     import wandb
@@ -85,6 +87,8 @@ if __name__ == '__main__':
     
     
     name=    open(os.path.join(opt.results_dir, opt.name, "name.txt"), 'w')
+    total_data_count  = 0
+    model_win_count = 0
     for i, data in enumerate(dataset):
         #if i >= opt.num_test:  # only apply our model to opt.num_test images.
         #    break
@@ -96,9 +100,9 @@ if __name__ == '__main__':
         img_path = model.get_image_paths()     # get image paths
         #if i % 5 == 0:  # save images to an HTML file
         print('processing (%04d)-th image... %s, runtime: %f' % (i, img_path[0], end-start))
+        total_data_count+=1
 
-
-        if not opt.lt:
+        if opt.dump_imask:
             name.write(os.path.basename(img_path[0]))
             name.write("\n")
             result[i,0] = model.g_l2.cpu().detach().numpy()
@@ -111,10 +115,37 @@ if __name__ == '__main__':
             result[i,7] = model.pvb_3.cpu().detach().numpy()
             result[i,8] = model.l2.cpu().detach().numpy()
             result[i,9] = model.pvb.cpu().detach().numpy()
+        if opt.update_mask:
+            train_next_path = os.path.join(opt.dataroot,"train_next_%g"%(opt.update_train_round+1))
+            if not os.path.exists(train_next_path):
+                os.mkdir(train_next_path)
+            design = model.real_A.cpu().detach().numpy()[0,0,:,:]
+            mask = model.fake_B.cpu().detach().numpy()[0,0,:,:]
+            resist = model.nominal_C.cpu().detach().numpy()[0,0,:,:]
+            g_mask = model.real_B.cpu().detach().numpy()[0,0,:,:]
+            g_resist = model.real_C.cpu().detach().numpy()[0,0,:,:]
+            #print(design.shape, mask.shape, resist.shape, g_mask.shape, g_resist.shape)
+            if model.update_mask:
+                model_win_count+=1
+                filename = img_path[0].split('/')[-1][:-4]+'update.png'
+                new_data = np.concatenate((design, mask, resist),axis=1)
+            else:
+                filename = img_path[0].split('/')[-1]
+                new_data = np.concatenate((design, g_mask, g_resist),axis=1)
+            print(np.max(new_data),np.min(new_data))
+            new_data=new_data*255
+            cv2.imwrite(os.path.join(train_next_path,filename),new_data)
 
+        if opt.lt:
+            print(model.l2, model.a2_l2, model.pvb, model.a2_pvb)
+            result[i,0:4]= np.array([model.l2.cpu().detach().numpy(), model.a2_l2.cpu().detach().numpy(), model.pvb.cpu().detach().numpy(), model.a2_pvb.cpu().detach().numpy()])
 
         save_images(webpage, visuals, img_path, aspect_ratio=opt.aspect_ratio, width=opt.display_winsize, use_wandb=opt.use_wandb)
     webpage.save()  # save the HTML
     name.close()
-    if not opt.lt:
+    if not opt.update_mask:
         np.savetxt(os.path.join(opt.results_dir, opt.name, "result.csv"), result, delimiter=',')
+    
+    if opt.update_mask:
+        win_ratio = model_win_count *1.0 / total_data_count
+        print(win_ratio)

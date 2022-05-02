@@ -14,5 +14,5 @@ kernel:
   opt_kernel_scale: ${kernel.npy_path}/optKernel_scale.npy
   combo_opt_kernel: ${kernel.npy_path}/comboOptKernel.npy
   num_kernel_used:
-    opt_used: 15
+    opt_used: 24
     combo_used: 9 # min: 1 max: 2

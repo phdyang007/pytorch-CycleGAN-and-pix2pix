@@ -100,7 +100,7 @@ class LithoModel(BaseModel):
             #self.criterionGAN = networks.GANLoss(opt.gan_mode).to(self.device)  # define GAN loss.
             #self.criterionCycle = torch.nn.L1Loss()
             #self.criterionIdt = torch.nn.L1Loss()
-            self.criterionLitho = torch.nn.L1Loss()#networks.LpLoss(size_average=False)
+            self.criterionLitho = networks.LpLoss(size_average=False)
             #self.criterionMask = torch.nn.L1Loss()
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             #self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG_A.parameters(), self.netG_B.parameters()), lr=opt.lr, betas=(opt.beta1, 0.999))
@@ -156,6 +156,7 @@ class LithoModel(BaseModel):
                 self.iou_bg = (1-union_fg).sum()/(1-intersection_fg).sum()
 
                 self.iou = (self.iou_bg + self.iou_fg)/2.0
+                print(self.iou)
 
 
 

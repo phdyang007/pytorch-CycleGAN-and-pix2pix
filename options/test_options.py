@@ -23,7 +23,7 @@ class TestOptions(BaseOptions):
         parser.add_argument('--beta1', type=float, default=0.5, help='momentum term of adam')
 
         parser.add_argument('--dump_imask', action='store_true', help='dump the intermediate mask in each doinn step, only for doinn multi.')  
-
+        parser.add_argument('--update_mask', action='store_true', help='do the inference on training set and get better mask')  
         # rewrite devalue values
         #parser.set_defaults(model='test')
         # To avoid cropping, the load_size should be the same as crop_size

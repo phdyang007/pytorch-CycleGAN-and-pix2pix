@@ -1,2 +1,2 @@
-python3 train_lt.py --dataroot ./datasets/metalv0 --name litho_metalv0_doinn --netD n_layers --n_layers_D 3 --model litho --gpu_ids 4 --batch_size 4 --lr_policy step --lr_decay_iters 1 --pool_size 25 --netG_B oinnlitho
+python3 train_lt.py --dataroot ./datasets/metalv0 --name litho_metalv0_doinn --netD n_layers --n_layers_D 3 --model litho --gpu_ids 4 --batch_size 4 --lr_policy step --lr_decay_iters 2 --pool_size 25 --netG_B oinnlitho
 #python3 train_lt.py --dataroot ./datasets/metalv0 --name litho_metalv0_unet --netD n_layers --n_layers_D 3 --model litho --gpu_ids 4 --batch_size 4 --lr_policy step --lr_decay_iters 1 --pool_size 25 --netG_B unet

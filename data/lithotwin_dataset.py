@@ -25,6 +25,16 @@ class LithotwinDataset(BaseDataset):
             self.dir_AB = os.path.join(opt.dataroot, 'test_lt')  # get the image directory
         else:
             self.dir_AB = os.path.join(opt.dataroot, opt.phase)  # get the image directory
+        if opt.phase == 'test':
+            if opt.update_mask:
+                if opt.update_train_round==0:
+                    self.dir_AB = os.path.join(opt.dataroot, 'train')
+                else:
+                    self.dir_AB = os.path.join(opt.dataroot, 'train_next_%g'%(opt.update_train_round))
+        if opt.phase == 'train':
+            if opt.use_update_mask:
+                self.dir_AB = os.path.join(opt.dataroot, 'train_next_%g'%(opt.update_train_round))
+        #print(self.dir_AB)
         self.AB_paths = sorted(make_dataset(self.dir_AB, opt.max_dataset_size))  # get image paths
         assert(self.opt.load_size >= self.opt.crop_size)   # crop_size should be smaller than the size of loaded image
         #self.input_nc = self.opt.output_nc if self.opt.direction == 'BtoA' else self.opt.input_nc
@@ -61,6 +71,8 @@ class LithotwinDataset(BaseDataset):
         A = A_transform(A)
         B = B_transform(B)
         C = B_transform(C)
+        #v_epe_points = []
+        #h_epe_points = []
         #import torch
         #print(torch.max(A), torch.min(A))
         #quit()
