@@ -82,7 +82,10 @@ if __name__ == '__main__':
         model.test()           # run inference
         with torch.no_grad():
             a, b = model.get_F_criterion(None)
+            print(a,b)
             result[i,0], result[i,1] = a.cpu().detach().numpy(), b.cpu().detach().numpy()
+            if np.isnan(result[i,1]):
+                result[i,1] = result[i-1,1]
         visuals = model.get_current_visuals()  # get image results
         img_path = model.get_image_paths()   # get image paths
         names.append(img_path)

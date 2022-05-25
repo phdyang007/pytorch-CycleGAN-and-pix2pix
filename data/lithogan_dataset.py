@@ -4,6 +4,7 @@ from data.image_folder import make_dataset
 from PIL import Image
 
 
+    
 class LithoGANDataset(BaseDataset):
     """A dataset class for 3 paired image dataset.
     A: design

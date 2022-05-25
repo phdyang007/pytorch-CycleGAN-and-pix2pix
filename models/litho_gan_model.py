@@ -174,11 +174,18 @@ class LithoGANModel(BaseModel):
         self.real_mask = self.netF(self.real_high_res)
         self.real_mask_img = torch.argmax(self.real_mask, dim=1, keepdim=True)
         
-    def forward_attack(self):
+    def forward_attack(self, original=None):
         self.forward_F()
-        self.real_resist = self.simulate(self.real_high_res)
+        if original is None:
+            self.real_resist = self.simulate(self.real_high_res)
+        else:
+            self.real_resist = original
         self.loss_F = self.criterionLitho(self.real_mask, self.to_one_hot(self.real_resist))  
         return self.loss_F
+    
+    def forward_uncertainty(self):
+        self.forward_F()
+        return torch.absolute(self.real_mask[...,0] - self.real_mask[...,1]).mean()
         
     def backward_D(self):
         """Calculate GAN loss for the discriminator"""
