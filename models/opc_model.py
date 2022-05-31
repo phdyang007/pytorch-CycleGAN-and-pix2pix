@@ -142,7 +142,8 @@ class OPCModel(BaseModel):
         self.real_B = input['B'].to(self.device)
         self.real_C = input['C'].to(self.device)
         self.image_paths = input['A_paths' if AtoB else 'B_paths']
-
+        self.turn_off = torch.zeros_like(self.real_A).type('torch.cuda.FloatTensor')
+        self.turn_off[:,:,512:1536,512:1536]=1.0
 
         self.loss_G_A = 0
         self.loss_G_A_GAN = 0
@@ -324,9 +325,10 @@ class OPCModel(BaseModel):
                 target = target.int()
                 resist_ml=resist_ml.int()
                 resist_ilt=resist_ilt.int()
-                self.h_epes_ml, self.v_epes_ml, target = self.get_epe_via(target, resist_ml, h_epe_points, v_epe_points)
-                self.h_epes_ilt, self.v_epes_ilt, _ = self.get_epe_via(target, resist_ilt, h_epe_points, v_epe_points)
-
+                self.h_epes_ml, self.v_epes_ml, target = self.get_epe_metal(target, resist_ml, h_epe_points, v_epe_points)
+                self.h_epes_ilt, self.v_epes_ilt, _ = self.get_epe_metal(target, resist_ilt, h_epe_points, v_epe_points)
+                #self.h_epes_ml, self.v_epes_ml, target = self.get_epe_via(target, resist_ml, h_epe_points, v_epe_points)
+                #self.h_epes_ilt, self.v_epes_ilt, _ = self.get_epe_via(target, resist_ilt, h_epe_points, v_epe_points)
                 self.real_A[0,0,:,:] = target[1024:7168,1024:7168].type('torch.cuda.FloatTensor')
 
                 ml_epes = np.absolute(np.array(self.h_epes_ml+self.v_epes_ml))
@@ -335,7 +337,7 @@ class OPCModel(BaseModel):
                 self.ilt_epe_count = len(np.where(ilt_epes==self.epe_th-1)[0])
                 print("ml epe violation count %g; ilt epe violation count %g."%(self.ml_epe_count,self.ilt_epe_count))
 
-
+                print(torch.max(target))
                 
 
                 
@@ -350,11 +352,13 @@ class OPCModel(BaseModel):
         v_epe_count = len(v_epe_points)
         h_epes = []
         v_epes = []
+        count=0
         #checking horizontal epe
         for point in h_epe_points:
             
             if point[0]<= 1536 or point[1]<= 1536 or point[0]>= 6656 or point[1]>= 6656:
                 continue
+            count+=1
             target[point[1]-3:point[1]+3,point[0]-3:point[0]+3]=1
             if point[-1]==-1:
                 if resist[point[1],point[0]]==1: #positive epe
@@ -383,6 +387,7 @@ class OPCModel(BaseModel):
         for point in v_epe_points:
             if point[0]<= 1536 or point[1]<= 1536 or point[0]>= 6656 or point[1]>= 6656:
                 continue
+            count+=1
             target[point[1]-3:point[1]+3,point[0]-3:point[0]+3]=1   # debug epe control points 
             if point[-1]==-1:
                 
@@ -408,11 +413,11 @@ class OPCModel(BaseModel):
                             break 
                     v_epes.append(-disp) 
 
-
+        print("total epe check point %g"%count)
         return h_epes, v_epes, target 
 
 
-    def get_epe(self,target,resist,h_epe_points,v_epe_points):
+    def get_epe_metal(self,target,resist,h_epe_points,v_epe_points):
         overlap = target & resist 
         union = target | resist 
         diff = union-overlap 
@@ -513,9 +518,9 @@ class OPCModel(BaseModel):
     
     def backward_G_A_pretrain(self):
         
-        self.loss_G_A = self.criterionMask(self.fake_B, self.real_B) #mask v.s. ground mask  us L1 loss to avoid blur for the sake of litho accuracy.
+        self.loss_G_A = self.criterionMask(self.fake_B*self.turn_off, self.real_B*self.turn_off) #mask v.s. ground mask  us L1 loss to avoid blur for the sake of litho accuracy.
 
-
+        #self.loss_G_A = self.criterionMask(self.fake_B, self.real_B)
         #self.loss_G   = self.loss_G_A
  
 

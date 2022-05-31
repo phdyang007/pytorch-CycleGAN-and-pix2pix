@@ -1,0 +1,1380 @@
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 1                             	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/1_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_1
+Pure Inference Time elasped: 5.128442
+tensor(920812., device='cuda:4') tensor(1213433., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 382; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.861946
+1 tensor(920812., device='cuda:4') tensor(717711., device='cuda:4') tensor(1213433., device='cuda:4') tensor(1073631., device='cuda:4') 382 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 2                             	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/2_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_2
+Pure Inference Time elasped: 5.147117
+tensor(653449., device='cuda:4') tensor(1142801., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 80; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.743848
+2 tensor(653449., device='cuda:4') tensor(717711., device='cuda:4') tensor(1142801., device='cuda:4') tensor(1073631., device='cuda:4') 80 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 3                             	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/3_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_3
+Pure Inference Time elasped: 5.151246
+tensor(696443., device='cuda:4') tensor(1219853., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 79; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.756192
+3 tensor(696443., device='cuda:4') tensor(717711., device='cuda:4') tensor(1219853., device='cuda:4') tensor(1073631., device='cuda:4') 79 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 4                             	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/4_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_4
+Pure Inference Time elasped: 5.122704
+tensor(662336., device='cuda:4') tensor(1196210., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 69; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.711441
+4 tensor(662336., device='cuda:4') tensor(717711., device='cuda:4') tensor(1196210., device='cuda:4') tensor(1073631., device='cuda:4') 69 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 5                             	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/5_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_5
+Pure Inference Time elasped: 5.125509
+tensor(614230., device='cuda:4') tensor(1178703., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 47; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.681767
+5 tensor(614230., device='cuda:4') tensor(717711., device='cuda:4') tensor(1178703., device='cuda:4') tensor(1073631., device='cuda:4') 47 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 6                             	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/6_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_6
+Pure Inference Time elasped: 5.175547
+tensor(664977., device='cuda:4') tensor(1220297., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 69; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.794170
+6 tensor(664977., device='cuda:4') tensor(717711., device='cuda:4') tensor(1220297., device='cuda:4') tensor(1073631., device='cuda:4') 69 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 7                             	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/7_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_7
+Pure Inference Time elasped: 5.142756
+tensor(637989., device='cuda:4') tensor(1218375., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 54; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.724289
+7 tensor(637989., device='cuda:4') tensor(717711., device='cuda:4') tensor(1218375., device='cuda:4') tensor(1073631., device='cuda:4') 54 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 8                             	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/8_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_8
+Pure Inference Time elasped: 5.133811
+tensor(619498., device='cuda:4') tensor(1161653., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 55; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.693097
+8 tensor(619498., device='cuda:4') tensor(717711., device='cuda:4') tensor(1161653., device='cuda:4') tensor(1073631., device='cuda:4') 55 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 9                             	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/9_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_9
+Pure Inference Time elasped: 5.136510
+tensor(606927., device='cuda:4') tensor(1189834., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 40; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.691603
+9 tensor(606927., device='cuda:4') tensor(717711., device='cuda:4') tensor(1189834., device='cuda:4') tensor(1073631., device='cuda:4') 40 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 10                            	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/10_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_10
+Pure Inference Time elasped: 5.088136
+tensor(606783., device='cuda:4') tensor(1163004., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 43; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.667249
+10 tensor(606783., device='cuda:4') tensor(717711., device='cuda:4') tensor(1163004., device='cuda:4') tensor(1073631., device='cuda:4') 43 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 11                            	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/11_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_11
+Pure Inference Time elasped: 5.060900
+tensor(609375., device='cuda:4') tensor(1178800., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 45; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.671524
+11 tensor(609375., device='cuda:4') tensor(717711., device='cuda:4') tensor(1178800., device='cuda:4') tensor(1073631., device='cuda:4') 45 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 12                            	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/12_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_12
+Pure Inference Time elasped: 5.100443
+tensor(607105., device='cuda:4') tensor(1184223., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 46; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.647010
+12 tensor(607105., device='cuda:4') tensor(717711., device='cuda:4') tensor(1184223., device='cuda:4') tensor(1073631., device='cuda:4') 46 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 13                            	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/13_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_13
+Pure Inference Time elasped: 5.049233
+tensor(607701., device='cuda:4') tensor(1180758., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 44; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.630168
+13 tensor(607701., device='cuda:4') tensor(717711., device='cuda:4') tensor(1180758., device='cuda:4') tensor(1073631., device='cuda:4') 44 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 14                            	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/14_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_14
+Pure Inference Time elasped: 5.187394
+tensor(610814., device='cuda:4') tensor(1177288., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 47; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.775661
+14 tensor(610814., device='cuda:4') tensor(717711., device='cuda:4') tensor(1177288., device='cuda:4') tensor(1073631., device='cuda:4') 47 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 15                            	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/15_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_15
+Pure Inference Time elasped: 5.196358
+tensor(617672., device='cuda:4') tensor(1185372., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 47; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.804095
+15 tensor(617672., device='cuda:4') tensor(717711., device='cuda:4') tensor(1185372., device='cuda:4') tensor(1073631., device='cuda:4') 47 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 16                            	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/16_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_16
+Pure Inference Time elasped: 5.056812
+tensor(604589., device='cuda:4') tensor(1173794., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 41; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.594462
+16 tensor(604589., device='cuda:4') tensor(717711., device='cuda:4') tensor(1173794., device='cuda:4') tensor(1073631., device='cuda:4') 41 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 17                            	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/17_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_17
+Pure Inference Time elasped: 5.144099
+tensor(608783., device='cuda:4') tensor(1178152., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 48; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.699948
+17 tensor(608783., device='cuda:4') tensor(717711., device='cuda:4') tensor(1178152., device='cuda:4') tensor(1073631., device='cuda:4') 48 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 18                            	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/18_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_18
+Pure Inference Time elasped: 5.130101
+tensor(603272., device='cuda:4') tensor(1172985., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 40; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.663666
+18 tensor(603272., device='cuda:4') tensor(717711., device='cuda:4') tensor(1172985., device='cuda:4') tensor(1073631., device='cuda:4') 40 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 19                            	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/19_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_19
+Pure Inference Time elasped: 5.209695
+tensor(605342., device='cuda:4') tensor(1176943., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 41; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.753740
+19 tensor(605342., device='cuda:4') tensor(717711., device='cuda:4') tensor(1176943., device='cuda:4') tensor(1073631., device='cuda:4') 41 123
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+Warning: wandb package cannot be found. The option "--use_wandb" will result in error.
+----------------- Options ---------------
+                     A_nc: 1                             
+                     B_nc: 1                             
+                     C_nc: 1                             
+             aspect_ratio: 1.0                           
+               batch_size: 1                             
+                    beta1: 0.5                           
+          checkpoints_dir: ./checkpoints                 
+                crop_size: 256                           
+                 dataroot: ./datasets/metalv5            	[default: None]
+             dataset_mode: lithotwin                     
+                direction: AtoB                          
+          display_winsize: 256                           
+               dump_imask: False                         
+                    epoch: 20                            	[default: latest]
+                     eval: False                         
+                  gpu_ids: 4                             	[default: 0]
+                   ilt_lr: 10                            
+                init_gain: 0.02                          
+                init_type: normal                        
+                 input_nc: 1                             
+                  isTrain: False                         	[default: None]
+                load_iter: 0                             	[default: 0]
+                load_size: 256                           
+                       lt: True                          	[default: False]
+                 lt_phase: 1                             
+         max_dataset_size: inf                           
+             max_ilt_step: 20                            
+                    model: opc                           	[default: litho_twin]
+               n_layers_D: 3                             
+                     name: opc_oinnopcgv2_metalv5_update_5	[default: experiment_name]
+                      ndf: 16                            
+                     netD: n_layers                      	[default: basic]
+                     netG: resnet_9blocks                
+                   netG_A: oinnopcgv2                    	[default: resnet_9blocks]
+                   netG_B: resnet_9blocks                
+                      ngf: 24                            
+               no_dropout: True                          
+                  no_flip: False                         
+                     norm: instance                      
+                 num_test: 10                            
+              num_threads: 1                             
+                output_nc: 1                             
+                    phase: test                          
+               preprocess: none                          
+              results_dir: ./results/                    
+           serial_batches: False                         
+                   suffix:                               
+              update_mask: False                         
+       update_train_round: 0                             
+                use_wandb: False                         
+                  verbose: False                         
+----------------- End -------------------
+dataset [LithotwinDataset] was created
+initialize network with normal
+model [OPCModel] was created
+loading the model from ./checkpoints/opc_oinnopcgv2_metalv5_update_5/pretrain/20_net_G_A.pth
+---------- Networks initialized -------------
+[Network G_A] Total number of parameters : 0.764 M
+-----------------------------------------------
+creating web directory ./results/opc_oinnopcgv2_metalv5_update_5/test_20
+Pure Inference Time elasped: 5.240422
+tensor(605682., device='cuda:4') tensor(1177020., device='cuda:4')
+tensor(717711., device='cuda:4') tensor(1073631., device='cuda:4')
+ml epe violation count 41; ilt epe violation count 123.
+processing (0000)-th image... ./datasets/metalv5/test_lt/mask1.png, runtime: 14.787570
+20 tensor(605682., device='cuda:4') tensor(717711., device='cuda:4') tensor(1177020., device='cuda:4') tensor(1073631., device='cuda:4') 41 123

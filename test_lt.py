@@ -137,14 +137,17 @@ if __name__ == '__main__':
             cv2.imwrite(os.path.join(train_next_path,filename),new_data)
 
         if opt.lt:
-            print(model.l2, model.a2_l2, model.pvb, model.a2_pvb)
-            result[i,0:4]= np.array([model.l2.cpu().detach().numpy(), model.a2_l2.cpu().detach().numpy(), model.pvb.cpu().detach().numpy(), model.a2_pvb.cpu().detach().numpy()])
+            print(opt.epoch, model.l2, model.a2_l2, model.pvb, model.a2_pvb, model.ml_epe_count, model.ilt_epe_count)
+            result[i,0:6]= np.array([model.l2.cpu().detach().numpy(), model.ml_epe_count, model.pvb.cpu().detach().numpy(), model.a2_l2.cpu().detach().numpy(),model.a2_pvb.cpu().detach().numpy(), model.ilt_epe_count])
+
 
         save_images(webpage, visuals, img_path, aspect_ratio=opt.aspect_ratio, width=opt.display_winsize, use_wandb=opt.use_wandb)
+        if opt.lt and (not opt.epoch=='best'):
+            break
     webpage.save()  # save the HTML
     name.close()
     if not opt.update_mask:
-        np.savetxt(os.path.join(opt.results_dir, opt.name, "result.csv"), result, delimiter=',')
+        np.savetxt(os.path.join(opt.results_dir, opt.name, "result%s.csv"%opt.epoch), result, delimiter=',', fmt='%d')
     
     if opt.update_mask:
         win_ratio = model_win_count *1.0 / total_data_count
