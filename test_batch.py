@@ -45,7 +45,7 @@ if __name__ == '__main__':
     opt = TestOptions().parse()  # get test options
     # hard-code some parameters for test
     opt.num_threads = 0   # test code only supports num_threads = 0
-    opt.batch_size = 1    # test code only supports batch_size = 1
+    opt.batch_size = 8    # test code only supports batch_size = 1
     opt.serial_batches = True  # disable data shuffling; comment this line if results on randomly chosen images are needed.
     opt.no_flip = True    # no flip; comment this line if results on flipped images are needed.
     opt.display_id = -1   # no visdom display; the test code saves the results to a HTML file.
@@ -70,28 +70,34 @@ if __name__ == '__main__':
     if opt.eval:
         model.eval()
     print(len(dataset))
-    result = np.zeros((min(len(dataset), opt.num_test),2)).astype(float)
+    if min(len(dataset), opt.num_test) % opt.batch_size == 0:
+        result = np.zeros((min(len(dataset), opt.num_test)//opt.batch_size ,2)).astype(float)
+    else:
+        result = np.zeros((min(len(dataset), opt.num_test)//opt.batch_size+1 ,2)).astype(float)
     names = []
+    iterations = 0
     for i, data in enumerate(dataset):
-        if i >= opt.num_test:  # only apply our model to opt.num_test images.
+        if i * opt.batch_size >= opt.num_test:  # only apply our model to opt.num_test images.
             break
         model.set_input(data)  # unpack data from data loader
-        model.test()           # run inference
+
         with torch.no_grad():
             a, b = model.get_F_criterion(None)
             print(a,b)
-            result[i,0], result[i,1] = a.cpu().detach().numpy(), b.cpu().detach().numpy()
+            result[i,0], result[i,1] = a.cpu().detach().numpy(), b.cpu().detach().numpy() * opt.batch_size / model.mask.shape[0]
             if np.isnan(result[i,1]):
                 result[i,1] = result[i-1,1]
+        iterations += 1
         visuals = model.get_current_visuals()  # get image results
         img_path = model.get_image_paths()   # get image paths
         names.append(img_path)
         if i % 500 == 0:  # save images to an HTML file
             print('processing (%04d)-th image... %s' % (i, img_path))
         save_images(webpage, visuals, img_path, aspect_ratio=opt.aspect_ratio, width=opt.display_winsize, use_wandb=opt.use_wandb)
+    print(result.shape[0], iterations)
     print(result.mean(axis=0))
     #print(result)
     print(result.min(axis=0))
     idx = result.argmin(axis=0)[1]
-    print(names[idx])
+    #print(names[idx])
     webpage.save()  # save the HTML
