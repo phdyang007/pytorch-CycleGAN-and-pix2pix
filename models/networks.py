@@ -162,6 +162,8 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
         net = oinnopc(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
     elif netG == 'oinnopc_seg':
         net =  oinnopc_seg(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
+    elif netG == 'oinnopc_seg_v2':
+        net =  oinnopc_seg_v2()
     elif netG == 'oinnopc_parallel':
         net = oinnopc_parallel(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
     elif netG == 'oinnopc_v001':
@@ -1972,3 +1974,151 @@ class oinnopc_seg(nn.Module):
         x = self.act_fn(x)
         x = self.convr3(x)
         return x
+
+class oinnopc_seg_v2(nn.Module):  
+    def __init__(self):
+        super(oinnopc_seg_v2, self).__init__()
+
+        # from design to mask, support global inference.
+        self.modes0 = 4
+        self.modes1 = 8
+        self.modes2 = 16
+        self.width = 32
+
+        self.refine_kernel = 3
+        self.in_channel = 1
+        self.subtile_size_0 = 16
+        self.subtile_size_1 = 32
+        self.subtile_size_2 = 64
+        self.smooth_kernel = 3
+        #self.cemap = cemap
+        self.vgg_channels = [4,8,16,16,8,4]
+        self.dilated = 3
+        #resize
+        self.resize0 = nn.AvgPool2d(8)
+        self.refine_channel = 3
+        #fourier
+        self.fno0 = SpectralConv2dLiftChannel(self.in_channel, self.width, self.width, self.modes0, self.modes0)
+        self.fno1 = SpectralConv2dLiftChannel(self.in_channel, self.width, self.width, self.modes1, self.modes1)
+        self.fno2 = SpectralConv2dLiftChannel(self.in_channel, self.width, self.width, self.modes2, self.modes2)
+
+        self.diconv0 = nn.Conv2d(in_channels=self.width, out_channels=self.width, kernel_size=self.dilated, padding = self.subtile_size_0, dilation=self.subtile_size_0)
+        self.diconv1 = nn.Conv2d(in_channels=self.width, out_channels=self.width, kernel_size=self.dilated, padding = self.subtile_size_1, dilation=self.subtile_size_1)
+        self.diconv2 = nn.Conv2d(in_channels=self.width, out_channels=self.width, kernel_size=self.dilated, padding = self.subtile_size_2, dilation=self.subtile_size_2)
+        #refine
+        self.convr0 = nn.Conv2d(in_channels=self.vgg_channels[5], out_channels=self.refine_channel, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr1 = nn.Conv2d(in_channels=self.refine_channel, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr2 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+
+        self.convr3 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.act_fn = nn.LeakyReLU(0.1)
+
+        #bypass unet
+        self.ds0 = PoolConv(1, self.vgg_channels[0])
+        self.vgg0 = VGGBlock(self.vgg_channels[0])
+        self.ds1 = PoolConv(self.vgg_channels[0], self.vgg_channels[1])
+        self.vgg1 = VGGBlock(self.vgg_channels[1])
+        self.ds2 = PoolConv(self.vgg_channels[1], self.vgg_channels[2])
+        self.vgg2 = VGGBlock(self.vgg_channels[2])   #250
+        self.us3 = UpConv(self.vgg_channels[2]+self.width*3, self.vgg_channels[3]) #merge with fno output
+        self.vgg3 = VGGBlock(self.vgg_channels[3])
+        self.us4 = UpConv(self.vgg_channels[3]+self.vgg_channels[1], self.vgg_channels[4])
+        self.vgg4 = VGGBlock(self.vgg_channels[4])
+        self.us5 = UpConv(self.vgg_channels[4]+self.vgg_channels[0], self.vgg_channels[5])
+        self.vgg5 = VGGBlock(self.vgg_channels[5])
+
+    def forward(self, x):
+
+        #fno pass
+        x_fno = self.resize0(x) 
+        #print(x_fno.shape)
+        n,c,h,w= x_fno.shape
+
+        #fno1
+        tile_c_0 = h//self.subtile_size_0
+
+        x_fno_input_0 = torch.zeros((n,tile_c_0*tile_c_0,c,self.subtile_size_0,self.subtile_size_0)).type('torch.cuda.FloatTensor')
+        x_fno_output_0 = torch.zeros((n,self.width,h,w)).type('torch.cuda.FloatTensor')
+        for i in range(tile_c_0):
+            for j in range(tile_c_0):
+                x_fno_input_0[:,i*tile_c_0+j,:,:,:] = x_fno[:,:,i*self.subtile_size_0:(i+1)*self.subtile_size_0,j*self.subtile_size_0:(j+1)*self.subtile_size_0]     
+
+        x_fno_tmp = self.fno0(x_fno_input_0.view(n*tile_c_0*tile_c_0,c,self.subtile_size_0,self.subtile_size_0))       
+        x_fno_tmp = self.act_fn(x_fno_tmp) #n*t*t, 16, 64, 64
+        
+        x_fno_tmp = x_fno_tmp.view(n, tile_c_0*tile_c_0, self.width, self.subtile_size_0, self.subtile_size_0)
+
+        for i in range(tile_c_0):
+            for j in range(tile_c_0):
+                x_fno_output_0[:,:,i*self.subtile_size_0:(i+1)*self.subtile_size_0,j*self.subtile_size_0:(j+1)*self.subtile_size_0] = x_fno_tmp[:,i*tile_c_0+j,:,:,:] #n c h w
+
+        x_fno_0 = self.diconv0(x_fno_output_0)
+        #print(x_fno_0.shape)
+        #fno2
+        tile_c_1 = h//self.subtile_size_1
+
+        x_fno_input_1 = torch.zeros((n,tile_c_1*tile_c_1,c,self.subtile_size_1,self.subtile_size_1)).type('torch.cuda.FloatTensor')
+        x_fno_output_1 = torch.zeros((n,self.width,h,w)).type('torch.cuda.FloatTensor')
+        for i in range(tile_c_1):
+            for j in range(tile_c_1):
+                x_fno_input_1[:,i*tile_c_1+j,:,:,:] = x_fno[:,:,i*self.subtile_size_1:(i+1)*self.subtile_size_1,j*self.subtile_size_1:(j+1)*self.subtile_size_1]     
+
+        x_fno_tmp = self.fno1(x_fno_input_1.view(n*tile_c_1*tile_c_1,c,self.subtile_size_1,self.subtile_size_1))       
+        x_fno_tmp = self.act_fn(x_fno_tmp) #n*t*t, 16, 64, 64
+        
+        x_fno_tmp = x_fno_tmp.view(n, tile_c_1*tile_c_1, self.width, self.subtile_size_1, self.subtile_size_1)
+
+        for i in range(tile_c_1):
+            for j in range(tile_c_1):
+                x_fno_output_1[:,:,i*self.subtile_size_1:(i+1)*self.subtile_size_1,j*self.subtile_size_1:(j+1)*self.subtile_size_1] = x_fno_tmp[:,i*tile_c_1+j,:,:,:] #n c h w
+
+        x_fno_1 = self.diconv1(x_fno_output_1)
+        #print(x_fno_1.shape)
+        #fno3
+        tile_c_2 = h//self.subtile_size_2
+
+        x_fno_input_2 = torch.zeros((n,tile_c_2*tile_c_2,c,self.subtile_size_2,self.subtile_size_2)).type('torch.cuda.FloatTensor')
+        x_fno_output_2 = torch.zeros((n,self.width,h,w)).type('torch.cuda.FloatTensor')
+        for i in range(tile_c_2):
+            for j in range(tile_c_2):
+                x_fno_input_2[:,i*tile_c_2+j,:,:,:] = x_fno[:,:,i*self.subtile_size_2:(i+1)*self.subtile_size_2,j*self.subtile_size_2:(j+1)*self.subtile_size_2]     
+
+        x_fno_tmp = self.fno2(x_fno_input_2.view(n*tile_c_2*tile_c_2,c,self.subtile_size_2,self.subtile_size_2))       
+        x_fno_tmp = self.act_fn(x_fno_tmp) #n*t*t, 16, 64, 64
+        
+        x_fno_tmp = x_fno_tmp.view(n, tile_c_2*tile_c_2, self.width, self.subtile_size_2, self.subtile_size_2)
+
+        for i in range(tile_c_2):
+            for j in range(tile_c_2):
+                x_fno_output_2[:,:,i*self.subtile_size_2:(i+1)*self.subtile_size_2,j*self.subtile_size_2:(j+1)*self.subtile_size_2] = x_fno_tmp[:,i*tile_c_2+j,:,:,:] #n c h w
+
+        x_fno_2 = self.diconv2(x_fno_output_2)        
+        #print(x_fno_2.shape)
+
+        x_unet = self.ds0(x)
+        x_unet_1000 = self.vgg0(x_unet)
+        x_unet = self.ds1(x_unet_1000)
+        x_unet_500 = self.vgg1(x_unet)
+        x_unet = self.ds2(x_unet_500)
+        x_unet_250 = self.vgg2(x_unet)
+
+        #merge fno and unet
+        x = torch.cat((x_fno_0, x_fno_1, x_fno_2, x_unet_250), 1)
+
+        #dconv
+        x = self.us3(x)
+        x = torch.cat((self.vgg3(x),x_unet_500), 1)
+        x = self.us4(x)
+        x = torch.cat((self.vgg4(x),x_unet_1000), 1)
+        x = self.us5(x)
+        x = self.vgg5(x)
+        #refine
+        x = self.convr0(x)
+        x = self.act_fn(x)
+        x = self.convr1(x)
+        x = self.act_fn(x)
+        x = self.convr2(x)
+        x = self.act_fn(x)
+        x = self.convr3(x)
+        return x
+
