@@ -50,6 +50,7 @@ if __name__ == '__main__':
     opt.no_flip = True    # no flip; comment this line if results on flipped images are needed.
     opt.display_id = -1   # no visdom display; the test code saves the results to a HTML file.
     dataset = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options
+    opt.eval = True
     model = create_model(opt)      # create a model given opt.model and other options
     model.setup(opt)               # regular setup: load and print networks; create schedulers
 
@@ -78,7 +79,7 @@ if __name__ == '__main__':
         model.set_input(data)  # unpack data from data loader
         model.test()           # run inference
         with torch.no_grad():
-            a, b = model.get_F_criterion(None)
+            a, b = model.get_F_criterion(model.real_resist)
             print(a,b)
             result[i,0], result[i,1] = a.cpu().detach().numpy(), b.cpu().detach().numpy()
             if np.isnan(result[i,1]):

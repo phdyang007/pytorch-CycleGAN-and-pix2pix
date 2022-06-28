@@ -24,6 +24,17 @@ class TestOptions(BaseOptions):
 
         parser.add_argument('--dump_imask', action='store_true', help='dump the intermediate mask in each doinn step, only for doinn multi.')  
 
+        #stylegan 
+        parser.add_argument('--outdir', type=str, default='./out_style/', help='output results here.')
+        parser.add_argument('--stylegan', type=str, default='./stylegan_model/network-snapshot-025000.pkl', help='stylegan model.')
+        parser.add_argument('--num_gen', type=int, default=50, help='number of data to generate.')
+        parser.add_argument('--aug_type', type=str, default='style', help='style|noise|random.')
+        parser.add_argument('--lr_alpha', type=float, default=0.01, help='step size for attack.')
+        parser.add_argument('--dist_norm', type=float, default=1.0, help='add distribution normalization.')
+        parser.add_argument('--quantize_aware', action='store_true', help='use STE for legalization.')
+        parser.add_argument('--loss_type', type=str, default='houdini', help='houdini|logprob|mse. valid only for style attack.')
+        parser.add_argument('--attack_epoch', type=int, default=10, help='number of epochs for attack.')
+
         # rewrite devalue values
         #parser.set_defaults(model='test')
         # To avoid cropping, the load_size should be the same as crop_size
