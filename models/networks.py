@@ -164,6 +164,8 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
         net =  oinnopc_seg(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
     elif netG == 'oinnopc_seg_v2':
         net =  oinnopc_seg_v2()
+    elif netG == 'oinnopc_seg_v3':
+        net = oinnopc_seg_v3()
     elif netG == 'oinnopc_parallel':
         net = oinnopc_parallel(modes1=50, modes2=50, width=16, in_channel=1, refine_channel=32, refine_kernel=3)
     elif netG == 'oinnopc_v001':
@@ -1980,9 +1982,9 @@ class oinnopc_seg_v2(nn.Module):
         super(oinnopc_seg_v2, self).__init__()
 
         # from design to mask, support global inference.
-        self.modes0 = 4
-        self.modes1 = 8
-        self.modes2 = 16
+        self.modes0 = 8
+        self.modes1 = 16
+        self.modes2 = 32
         self.width = 32
 
         self.refine_kernel = 3
@@ -1992,7 +1994,7 @@ class oinnopc_seg_v2(nn.Module):
         self.subtile_size_2 = 64
         self.smooth_kernel = 3
         #self.cemap = cemap
-        self.vgg_channels = [4,8,16,16,8,4]
+        self.vgg_channels = [8,16,32,32,16,8]
         self.dilated = 3
         #resize
         self.resize0 = nn.AvgPool2d(8)
@@ -2026,6 +2028,7 @@ class oinnopc_seg_v2(nn.Module):
         self.vgg4 = VGGBlock(self.vgg_channels[4])
         self.us5 = UpConv(self.vgg_channels[4]+self.vgg_channels[0], self.vgg_channels[5])
         self.vgg5 = VGGBlock(self.vgg_channels[5])
+
 
     def forward(self, x):
 
@@ -2120,5 +2123,70 @@ class oinnopc_seg_v2(nn.Module):
         x = self.convr2(x)
         x = self.act_fn(x)
         x = self.convr3(x)
+
+
         return x
 
+
+class oinnopc_seg_v3(nn.Module): 
+    # difference between oinnopc model. Output logits prior to tanh activation. Final output dual channel 2*res*res for segmentation
+    
+    def __init__(self, in_channel=1, refine_channel=32, refine_kernel = 3):
+        super(oinnopc_seg_v3, self).__init__()
+
+        # from design to mask, same as forward v2 as baseline.
+
+        self.refine_kernel = refine_kernel
+        self.in_channel = in_channel
+        self.refine_channel = refine_channel
+        #self.cemap = cemap
+        self.vgg_channels = [8,64,128,128,64,8]
+
+        #refine
+        self.convr0 = nn.Conv2d(in_channels=self.vgg_channels[5], out_channels=self.refine_channel, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr1 = nn.Conv2d(in_channels=self.refine_channel, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr2 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+
+        self.convr3 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.act_fn = nn.LeakyReLU(0.1)
+
+        #bypass unet
+        self.ds0 = PoolConv(1, self.vgg_channels[0])
+        self.vgg0 = VGGBlock(self.vgg_channels[0])
+        self.ds1 = PoolConv(self.vgg_channels[0], self.vgg_channels[1])
+        self.vgg1 = VGGBlock(self.vgg_channels[1])
+        self.ds2 = PoolConv(self.vgg_channels[1], self.vgg_channels[2])
+        self.vgg2 = VGGBlock(self.vgg_channels[2])   #250
+        self.us3 = UpConv(self.vgg_channels[2], self.vgg_channels[3]) #merge with fno output
+        self.vgg3 = VGGBlock(self.vgg_channels[3])
+        self.us4 = UpConv(self.vgg_channels[3]+self.vgg_channels[1], self.vgg_channels[4])
+        self.vgg4 = VGGBlock(self.vgg_channels[4])
+        self.us5 = UpConv(self.vgg_channels[4]+self.vgg_channels[0], self.vgg_channels[5])
+        self.vgg5 = VGGBlock(self.vgg_channels[5])
+        
+    def forward(self, x):
+
+        #unet pass
+        x_unet = self.ds0(x)
+        x_unet_1000 = self.vgg0(x_unet)
+        x_unet = self.ds1(x_unet_1000)
+        x_unet_500 = self.vgg1(x_unet)
+        x_unet = self.ds2(x_unet_500)
+        x_unet_250 = self.vgg2(x_unet)
+
+        #dconv
+        x = self.us3(x_unet_250)
+        x = torch.cat((self.vgg3(x),x_unet_500), 1)
+        x = self.us4(x)
+        x = torch.cat((self.vgg4(x),x_unet_1000), 1)
+        x = self.us5(x)
+        x = self.vgg5(x)
+        #refine
+        x = self.convr0(x)
+        x = self.act_fn(x)
+        x = self.convr1(x)
+        x = self.act_fn(x)
+        x = self.convr2(x)
+        x = self.act_fn(x)
+        x = self.convr3(x)
+        return x

@@ -128,6 +128,16 @@ class LithoAugModel(BaseModel):
         self.loss_F = self.criterionLitho(self.real_mask, self.to_one_hot(self.real_resist))  
         self.loss_F.backward()
         
+    def get_iou(self, data):
+        self.set_input(data)
+        self.forward()
+        self.real_mask = self.legalize_mask(self.real_mask_img, 0.5).int()
+        self.real_resist = self.real_resist.int()
+        intersection_fg = (self.real_mask & self.real_resist).float()
+        union_fg = (self.real_mask | self.real_resist).float()
+        iou_fg = (intersection_fg.sum(dim=(1,2,3)) + 1e-3)/ (union_fg.sum(dim=(1,2,3)) + 1e-3)
+        return iou_fg.reshape(-1).cpu().numpy().tolist(), self.image_paths
+        
     def get_F_criterion(self, real=None):
         if real != None:
             self.real_resist = real
