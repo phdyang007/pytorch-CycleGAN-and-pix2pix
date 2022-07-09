@@ -62,10 +62,9 @@ class LithoAugModel(BaseModel):
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             self.optimizer_F = torch.optim.Adam(self.netF.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
             self.optimizers.append(self.optimizer_F)
-        else:
-            self.kernel = Kernel()
-            self.cl = CUDA_LITHO(self.kernel)
-            self.MSELoss = torch.nn.MSELoss()
+        self.kernel = Kernel()
+        self.cl = CUDA_LITHO(self.kernel)
+        self.MSELoss = torch.nn.MSELoss()
 
     def set_input(self, input):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.

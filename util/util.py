@@ -5,6 +5,7 @@ import numpy as np
 from PIL import Image
 import os
 import matplotlib.pyplot as plt
+import dnnlib
 
 def tensor2im(input_image, imtype=np.uint8):
     """"Converts a Tensor array into a numpy image array.
@@ -124,3 +125,38 @@ def mkdir(path):
     """
     if not os.path.exists(path):
         os.makedirs(path)
+
+def get_args_from_opt(opt):
+    args = dnnlib.EasyDict()
+    args.num_gpus = len(opt.gpu_ids)
+    args.random_seed = 0
+    args.training_set_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderResizeDataset', files=[], use_labels=False, max_size=None, xflip=True)
+    args.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, num_workers=8, prefetch_factor=2)
+    
+    spec = dnnlib.EasyDict(dict(ref_gpus=args.num_gpus, kimg=opt.aug_kimg, mb=opt.gan_batch_size, mbstd=opt.gan_batch_size*args.num_gpus, fmaps=-1, lrate=-1, gamma=-1, ema=-1, ramp=0.05, map=2))
+    res = 256
+    spec.fmaps = 1 if res >= 512 else 0.5
+    spec.lrate = 0.0002 if res >= 1024 else 0.00025
+    spec.gamma = 0.0002 * (res ** 2) / spec.mb * 50 # heuristic formula
+    spec.ema = spec.mb * 10 / 32
+    # including modified arguments
+    args.G_reg_interval = None
+    args.D_reg_interval = None
+    args.G_kwargs = dnnlib.EasyDict(class_name='training.networks.Generator', z_dim=128, w_dim=128, mapping_kwargs=dnnlib.EasyDict(), synthesis_kwargs=dnnlib.EasyDict())
+    args.D_kwargs = dnnlib.EasyDict(class_name='training.networks.Discriminator', block_kwargs=dnnlib.EasyDict(), mapping_kwargs=dnnlib.EasyDict(), epilogue_kwargs=dnnlib.EasyDict())
+    args.G_kwargs.synthesis_kwargs.channel_base = args.D_kwargs.channel_base = int(spec.fmaps * 32768)
+    args.G_kwargs.synthesis_kwargs.channel_max = args.D_kwargs.channel_max = 128
+    args.G_kwargs.mapping_kwargs.num_layers = spec.map
+    args.G_kwargs.synthesis_kwargs.num_fp16_res = args.D_kwargs.num_fp16_res = 4 # enable mixed-precision training
+    args.G_kwargs.synthesis_kwargs.conv_clamp = args.D_kwargs.conv_clamp = 256 # clamp activations to avoid float16 overflow
+    args.D_kwargs.epilogue_kwargs.mbstd_group_size = spec.mbstd
+
+    args.G_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', lr=spec.lrate, betas=[0,0.99], eps=1e-8)
+    args.D_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', lr=spec.lrate, betas=[0,0.99], eps=1e-8)
+    args.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss', r1_gamma=spec.gamma)
+
+    args.total_kimg = spec.kimg
+    args.batch_size = spec.mb
+    args.batch_gpu = spec.mb // spec.ref_gpus
+    
+    return args

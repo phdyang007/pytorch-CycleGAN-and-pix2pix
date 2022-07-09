@@ -31,26 +31,36 @@ class StyleGANModel(BaseModel):
         self.generate_num = opt.rank_buffer_size 
         self.upsampler = torch.nn.Upsample(scale_factor=8, mode='bicubic')
         
-    def init(self, G_kwargs, D_kwargs)
+    def init(self, G_kwargs, D_kwargs):
         # setup netG/netD
-        common_kwargs = dict(c_dim=1, img_resolution=256, img_channels=1)
-        self.netG = dnnlib.util.construct_class_by_name(**G_kwargs, **common_kwargs).train().requires_grad_(False).to(device) # subclass of torch.nn.Module
-        self.netD = dnnlib.util.construct_class_by_name(**D_kwargs, **common_kwargs).train().requires_grad_(False).to(device) # subclass of torch.nn.Module
+        common_kwargs = dict(c_dim=0, img_resolution=256, img_channels=1)
+        # keep these models on cpu a copy?
+        self.netG = dnnlib.util.construct_class_by_name(**G_kwargs, **common_kwargs).train().requires_grad_(False) # subclass of torch.nn.Module
+        self.netD = dnnlib.util.construct_class_by_name(**D_kwargs, **common_kwargs).train().requires_grad_(False) # subclass of torch.nn.Module
         # load models from pkl file
-        with dnnlib.util.open_url(self.opt.stylegan_pkl) as f:
+        with dnnlib.util.open_url(self.opt.gan_model) as f:
             resume_data = legacy.load_network_pkl(f)
         for name, module in [('G', self.netG), ('D', self.netD)]:
             misc.copy_params_and_buffers(resume_data[name], module, require_all=False)
             
+    def forward(x):
+        return x
+    
+    def optimize_parameters():
+        pass
+
+    def set_input(x):
+        return
+            
     def finetune(self, args):
-        torch.multiprocessing.set_start_method('spawn')
+        torch.multiprocessing.set_start_method('spawn', force=True)
         with tempfile.TemporaryDirectory() as temp_dir:
             if args.num_gpus == 1:
                 self.subprocess_fn(rank=0, args=args, temp_dir=temp_dir)
             else:
                 torch.multiprocessing.spawn(fn=self.subprocess_fn, args=(args, temp_dir), nprocs=args.num_gpus)
 
-    def subprocess_fn(rank, args, temp_dir):
+    def subprocess_fn(self, rank, args, temp_dir):
         # Init torch.distributed.
         if args.num_gpus > 1:
             init_file = os.path.abspath(os.path.join(temp_dir, '.torch_distributed_init'))
@@ -64,7 +74,7 @@ class StyleGANModel(BaseModel):
         if rank != 0:
             custom_ops.verbosity = 'none'
         # Execute training loop.
-        self.training_loop.training_loop(rank=rank, **args)
+        self.training_loop(rank=rank, **args)
     
     def training_loop(
         self,
@@ -222,24 +232,29 @@ class StyleGANModel(BaseModel):
         if rank == 0:
             misc.copy_params_and_buffers(snapshot_data['G'], self.netG, require_all=False)
             misc.copy_params_and_buffers(snapshot_data['D'], self.netD, require_all=False)
+            
+        del G, D
 
         #TODO: get batched generation + multi-gpu
-        def generate_random(self, outdir, model):
-            seeds = list(range(self.generate_num)) 
-            results = []
-            label = torch.zeros([1, self.G.c_dim], device=device)
-            for i, seed in enumerate(seeds):
-                z = torch.from_numpy(np.random.RandomState(seed).randn(1, self.G.z_dim)).to(device)
-                img = self.G(z, label, truncation_psi=truncation_psi, noise_mode='const')
-                img = self.upsampler(img)
-                img = (img + 1) * 0.5
-                model.mask = img
-                model.legalize_mask(model.mask)
-                model.forward()
-                _, iou_fg = model.get_F_criterion(None)
-                results.append(iou_fg)
-                mask_golden = (model.real_resist[0,0,:,:] * 255).to(torch.uint8)
-                img_output = (img[0,0,:,:] * 255).to(torch.uint8)
-                img_output = torch.cat((img_output,mask_golden), 1)
-                PIL.Image.fromarray(img_output.detach().cpu().numpy(), 'L').save(f'{outdir}/seed{i:04d}.png')
-            return results
+    def generate_random(self, outdir, model):
+        device = torch.device('cuda', 0)
+        seeds = list(range(self.generate_num)) 
+        results = []
+        label = torch.zeros([1, self.netG.c_dim], device=device)
+        self.netG.to(device)
+        for i, seed in enumerate(seeds):
+            z = torch.from_numpy(np.random.RandomState(seed).randn(1, self.netG.z_dim)).to(device)
+            img = self.netG(z, label, truncation_psi=1.0, noise_mode='const')
+            img = self.upsampler(img)
+            img = (img + 1) * 0.5
+            model.mask = img
+            model.legalize_mask(model.mask)
+            model.forward()
+            _, iou_fg = model.get_F_criterion(None)
+            results.append(iou_fg)
+            mask_golden = (model.real_resist[0,0,:,:] * 255).to(torch.uint8)
+            img_output = (img[0,0,:,:] * 255).to(torch.uint8)
+            img_output = torch.cat((img_output,mask_golden), 1)
+            PIL.Image.fromarray(img_output.detach().cpu().numpy(), 'L').save(f'{outdir}/seed{i:04d}.png')
+        self.netG.cpu()
+        return results
