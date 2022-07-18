@@ -47,10 +47,13 @@ if __name__ == '__main__':
     
     for i in range(opt.aug_iter):
         
-        # Generate new image with styleGAN
-        newDir = "{}_{}".format(opt.outdirPrefix, i)
+        # Generate new image with styleGANRF
+        print("Generating new images.")
+        newDir = "./{}_{}_{}/iter_{}".format(opt.augmode, opt.gan_batch_size, opt.aug_iter, i)
         mkdir(newDir)
-        stylegan.generate_random(newDir, model)
+        res = stylegan.generate_data(newDir, model, opt.augmode)
+        with open("./results.txt", 'a') as f:
+            f.write("Generated data with iou_fg of {:.8f}\n".format(sum(res)/len(res)))
         opt.dataroot = newDir
         newDataset = create_dataset(opt)
         
@@ -59,13 +62,21 @@ if __name__ == '__main__':
         totalDataset.dataset.add(newDataset.dataset)
         
         # Train styleGAN
+        if i == opt.aug_iter - 1:
+            break
+        print("Updating GAN model.")
         args.training_set_kwargs.files = bufferDataset.dataset.buffer
         stylegan.finetune(args)
-
-    print(len(totalDataset))
+    
     # Train DOINN 
-    for epoch in range(opt.n_epochs):
+    print("Start model retraining on all data {}.".format(len(totalDataset)))
+    for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):
         for i, data in enumerate(totalDataset):
             model.set_input(data)
             model.optimize_parameters()
-    model.save_networks("iteration_{}".format(iteration))
+            if epoch == opt.epoch_count:
+                break
+        break
+        model.update_learning_rate()
+                   
+    model.save_networks("iteration_{}_{}_{}".format(opt.augmode, opt.gan_batch_size, opt.aug_iter))

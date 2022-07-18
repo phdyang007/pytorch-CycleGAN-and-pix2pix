@@ -118,9 +118,18 @@ class LithoAugModel(BaseModel):
         self.loss_F = self.criterionLitho(self.real_mask, self.to_one_hot(self.real_resist))  
         return self.loss_F
         
-    def forward_uncertainty(self):
+    def forward_uncertainty(self, loss_type):
         self.forward()
-        return self.MSELoss(self.real_mask[...,0], self.real_mask[...,1])
+        if loss_type == 'houdini':
+            x = torch.mul( self.real_mask[...,0], self.real_mask[...,1])
+            return -x.mean() 
+        elif loss_type == 'logprob':
+            x, _ =  torch.max( self.logSoftmax(self.real_mask), dim=1)
+            return -x.mean()
+        elif loss_type == 'mse':
+            return self.MSELoss(self.real_mask[...,0], self.real_mask[...,1])
+        else:
+            assert False, "{} not supported".format(loss_type)
         
     def backward(self):
         #print(self.real_mask.shape, self.to_one_hot(self.real_resist).shape)
@@ -153,7 +162,7 @@ class LithoAugModel(BaseModel):
         self.union = union_fg
         #self.iou_fg = intersection_fg.sum()/union_fg.sum()
         self.iou_fg = intersection_fg.sum(dim=(1,2,3))/union_fg.sum(dim=(1,2,3))
-        print(self.iou_fg)
+        #print(self.iou_fg) # here prints
         #self.iou_bg = (1-union_fg).sum()/(1-intersection_fg).sum()
         #self.iou = (self.iou_bg + self.iou_fg)/2.0
         return loss, self.iou_fg.mean()

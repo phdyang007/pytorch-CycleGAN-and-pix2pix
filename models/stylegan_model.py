@@ -18,7 +18,63 @@ from torch_utils import training_stats
 from torch_utils.ops import conv2d_gradfix
 from torch_utils.ops import grid_sample_gradfix
 import legacy
+from torch.distributions.normal import Normal
 
+def uniform_quantize(k, gradient_clip=False):
+    class qfn(torch.autograd.Function):
+        @staticmethod
+        def forward(ctx, input):
+            if k == 32:
+                out = input
+            elif k == 1:
+                out = torch.sign(input)
+            else:
+                n = float(2 ** k - 1)
+                out = torch.round(input * n) / n
+            return out
+
+        @staticmethod
+        def backward(ctx, grad_output):
+            grad_input = grad_output.clone()
+            if gradient_clip:
+                grad_input.clamp_(-1, 1)
+            return grad_input
+
+    return qfn().apply
+
+class Noise:
+    def __init__(self, block_resolutions, device='cpu'):
+        self.block_resolutions = block_resolutions
+        self.num = (1, )  + (2, ) * (len(self.block_resolutions) - 1)
+        self.device = device
+        self.size = sum([(self.block_resolutions[i] ** 2) * self.num[i] for i in range(len(self.num))])
+    def generate(self, batch=1, input=None):
+        if input == None:
+            noise = torch.randn(batch*self.size, device=self.device)
+        else:
+            noise = input
+            assert noise.shape == (batch*self.size, )
+        block_noise = {}
+        idx = 0
+        for num, res in zip(self.num, self.block_resolutions):
+            block_noise[f'b{res}'] = []
+            for _ in range(num):
+                length = batch * res * res
+                cur = noise[idx: idx+length].reshape(-1, 1, res, res)
+                idx += length
+                block_noise[f'b{res}'].append(cur)
+        return noise, block_noise
+    def transform_noise(self, noise, batch=1):
+        block_noise = {}
+        idx = 0
+        for num, res in zip(self.num, self.block_resolutions):
+            block_noise[f'b{res}'] = []
+            for _ in range(num):
+                length = batch * res * res
+                cur = noise[idx: idx+length].reshape(-1, 1, res, res)
+                idx += length
+                block_noise[f'b{res}'].append(cur)
+        return block_noise
 
 class StyleGANModel(BaseModel):
     def __init__(self, opt):
@@ -30,6 +86,7 @@ class StyleGANModel(BaseModel):
         BaseModel.__init__(self, opt)
         self.generate_num = opt.rank_buffer_size 
         self.upsampler = torch.nn.Upsample(scale_factor=8, mode='bicubic')
+        self.seed = 0
         
     def init(self, G_kwargs, D_kwargs):
         # setup netG/netD
@@ -235,10 +292,11 @@ class StyleGANModel(BaseModel):
             
         del G, D
 
-        #TODO: get batched generation + multi-gpu
+    #TODO: get batched generation + multi-gpu
     def generate_random(self, outdir, model):
         device = torch.device('cuda', 0)
-        seeds = list(range(self.generate_num)) 
+        seeds = list(range(self.seed, self.seed + self.generate_num)) 
+        self.seed += self.generate_num
         results = []
         label = torch.zeros([1, self.netG.c_dim], device=device)
         self.netG.to(device)
@@ -251,10 +309,120 @@ class StyleGANModel(BaseModel):
             model.legalize_mask(model.mask)
             model.forward()
             _, iou_fg = model.get_F_criterion(None)
-            results.append(iou_fg)
+            results.append(iou_fg.item())
             mask_golden = (model.real_resist[0,0,:,:] * 255).to(torch.uint8)
             img_output = (img[0,0,:,:] * 255).to(torch.uint8)
             img_output = torch.cat((img_output,mask_golden), 1)
             PIL.Image.fromarray(img_output.detach().cpu().numpy(), 'L').save(f'{outdir}/seed{i:04d}.png')
         self.netG.cpu()
         return results
+    
+    def attack_style(self, z, G, model, device, lr_alpha=0.01, dist_norm=0.1, loss_type='houdini', quantize_aware=True, epochs=10, gradient_clip=True):
+        upsampler = torch.nn.Upsample(scale_factor=8, mode='bicubic')
+        G.eval(), model.eval()
+        label = torch.zeros([1, G.c_dim], device=device)
+        optimizer = torch.optim.Adam([z], lr=lr_alpha)
+        z.requires_grad = True
+        norm_dist = Normal(torch.tensor([0.0], device=device), torch.tensor([1.0], device=device))
+        quantizer = uniform_quantize(k=1, gradient_clip=gradient_clip)
+        for i in range(epochs):
+            optimizer.zero_grad()
+            img = G(z, label, truncation_psi=1.0, noise_mode='const')
+            img = upsampler(img)
+            if quantize_aware:
+                img = quantizer(img)
+            else:
+                img = model.legalize_mask(img, 0)
+            img = (img + 1 ) * 0.5
+            model.mask = img
+            if dist_norm > 1e-5:
+                loss = model.forward_uncertainty(loss_type) - dist_norm * norm_dist.log_prob(z).mean()
+            else:
+                loss = model.forward_uncertainty(loss_type)
+            loss.backward()
+            optimizer.step()
+        return img
+    
+    def attack_style_loop(self, outdir, model): 
+        device = torch.device('cuda', 0)
+        seeds = list(range(self.seed, self.seed + self.generate_num)) 
+        self.seed += self.generate_num
+        results = []
+        label = torch.zeros([1, self.netG.c_dim], device=device)
+        self.netG.to(device)
+        for i, seed in enumerate(seeds):
+            z = torch.from_numpy(np.random.RandomState(seed).randn(1, self.netG.z_dim)).to(device)
+            img = self.attack_style(z, self.netG, model, device=device) 
+            model.mask = img
+            model.legalize_mask(model.mask)
+            model.forward()
+            _, iou_fg = model.get_F_criterion(None)
+            results.append(iou_fg.item())
+            mask_golden = (model.real_resist[0,0,:,:] * 255).to(torch.uint8)
+            img_output = (img[0,0,:,:] * 255).to(torch.uint8)
+            img_output = torch.cat((img_output,mask_golden), 1)
+            PIL.Image.fromarray(img_output.detach().cpu().numpy(), 'L').save(f'{outdir}/seed{i:04d}.png')
+        self.netG.cpu()
+        return results
+    
+    def attack_noise(self, z, G, model, device, lr_alpha=1.0, dist_norm=0.1, quantize_aware=True, epochs=10, gradient_clip=True):
+        noise_module = Noise(G.synthesis.block_resolutions, device)
+        noise, noise_block = noise_module.generate()
+        upsampler = torch.nn.Upsample(scale_factor=8, mode='bicubic')
+        G.eval(), model.eval()
+        label = torch.zeros([1, G.c_dim], device=device)
+        optimizer = torch.optim.Adam([noise], lr=lr_alpha)
+        noise.requires_grad = True
+        original = None
+        quantizer = uniform_quantize(k=1, gradient_clip=gradient_clip)
+        norm_dist = Normal(torch.tensor([0.0], device=device), torch.tensor([1.0], device=device))
+        for i in range(epochs):
+            optimizer.zero_grad()
+            noise_block = noise_module.transform_noise(noise)
+            img = G(z, label, truncation_psi=1.0, noise_mode='random', input_noise=noise_block)
+            img = upsampler(img)
+            if quantize_aware:
+                img = quantizer(img)
+            else:
+                img = model.legalize_mask(img, 0)
+            img = (img + 1) * 0.5
+            model.mask = img
+            if dist_norm > 1e-5:
+                loss = -model.forward_attack(original) - dist_norm * norm_dist.log_prob(noise).mean()
+            else:
+                loss = -model.forward_attack(original)
+            if original is None:
+                original = model.real_resist.detach()
+            loss.backward()
+            optimizer.step()
+        return img
+    
+    def attack_noise_loop(self, outdir, model): 
+        device = torch.device('cuda', 0)
+        seeds = list(range(self.seed, self.seed + self.generate_num)) 
+        self.seed += self.generate_num
+        results = []
+        label = torch.zeros([1, self.netG.c_dim], device=device)
+        self.netG.to(device)
+        for i, seed in enumerate(seeds):
+            z = torch.from_numpy(np.random.RandomState(seed).randn(1, self.netG.z_dim)).to(device)
+            img = self.attack_noise(z, self.netG, model, device)
+            model.mask = img
+            model.forward()
+            _, iou_fg = model.get_F_criterion(None)
+            results.append(iou_fg.item())
+            img_output = (img[0,0,:,:] * 255).to(torch.uint8)
+            mask_golden = (model.real_resist[0,0,:,:] * 255).to(torch.uint8)
+            img_output = torch.cat((img_output,mask_golden), 1)
+            PIL.Image.fromarray(img_output.detach().cpu().numpy(), 'L').save(f'{outdir}/seed{i:04d}.png')
+        return results
+    
+    def generate_data(self, outdir, model, method):
+        if method == 'adv_style':
+            return self.attack_style_loop(outdir, model)
+        if method == 'adv_noise':
+            return self.attack_noise_loop(outdir, model)
+        if method == 'random':
+            return self.generate_random(outdir, model)
+        assert False, "{} not supported".format(method)
+        

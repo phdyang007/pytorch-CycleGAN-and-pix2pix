@@ -24,14 +24,13 @@ class AugOptions(BaseOptions):
         parser.add_argument('--lr_policy', type=str, default='linear', help='learning rate policy. [linear | step | plateau | cosine]')
         parser.add_argument('--lr_decay_iters', type=int, default=50, help='multiply by a gamma every lr_decay_iters iterations')
         # augmentation parameters
-        parser.add_argument('--augmode', type=str, default='rand', help='data augmentation mode. one of rand|adv_style|adv_noise|none.')
+        parser.add_argument('--augmode', type=str, default='random', help='data augmentation mode. one of random|adv_style|adv_noise|none.')
         parser.add_argument('--gan_batch_size', type=int, default=10, help='batch size used for finetune styleGAN.')
-        parser.add_argument('--outdirPrefix', type=str, default='./output', help='data augmentation mode. one of rand|adv_style|adv_noise|none.')
         parser.add_argument('--augroot', type=str, default='./augmentation', help='directory to save augmented data.')
-        parser.add_argument('--gan_model', type=str, default='/workspace/stylegan2-ada-pytorch/stylegan_model/network-snapshot-025000.pkl', help='pickle file for pre-trained styleGAN model.')
+        parser.add_argument('--gan_model', type=str, default='./stylegan_model/network-snapshot-025000.pkl', help='pickle file for pre-trained styleGAN model.')
         parser.add_argument('--rank_buffer_size', type=int, default=10, help='number of new data generated each augmentation iteration.')
         parser.add_argument('--aug_kimg', type=int, default=6, help='number of images seen by discriminator in GAN finetune.')
-        parser.add_argument('--aug_iter', type=int, default=2, help='number of augmentation iteration')
+        parser.add_argument('--aug_iter', type=int, default=1, help='number of augmentation iteration')
         # set training to True
         self.isTrain = True
         return parser
