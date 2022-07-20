@@ -84,7 +84,10 @@ class BaseModel(ABC):
         if self.isTrain:
             self.schedulers = [networks.get_scheduler(optimizer, opt) for optimizer in self.optimizers]
         if not self.isTrain or opt.continue_train:
-            load_suffix = '%d' % opt.load_iter if opt.load_iter > 0 else opt.epoch
+            if type(opt.load_iter) == str:
+                load_suffix = opt.load_iter
+            else:
+                load_suffix = '%d' % opt.load_iter if opt.load_iter > 0 else opt.epoch
             self.load_networks(load_suffix)
         self.print_networks(opt.verbose)
 

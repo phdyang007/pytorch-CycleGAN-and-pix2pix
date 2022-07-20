@@ -61,7 +61,9 @@ if __name__ == '__main__':
 
     # create a website
     web_dir = os.path.join(opt.results_dir, opt.name, '{}_{}'.format(opt.phase, opt.epoch))  # define the website directory
-    if opt.load_iter > 0:  # load_iter is 0 by default
+    if type(opt.load_iter) == str:
+        web_dir = '{:s}_iter{:s}'.format(web_dir, opt.load_iter)
+    elif opt.load_iter > 0:  # load_iter is 0 by default
         web_dir = '{:s}_iter{:d}'.format(web_dir, opt.load_iter)
     print('creating web directory', web_dir)
     webpage = html.HTML(web_dir, 'Experiment = %s, Phase = %s, Epoch = %s' % (opt.name, opt.phase, opt.epoch))
@@ -79,7 +81,8 @@ if __name__ == '__main__':
         model.set_input(data)  # unpack data from data loader
         model.test()           # run inference
         with torch.no_grad():
-            a, b = model.get_F_criterion(model.real_resist)
+            #a, b = model.get_F_criterion(model.real_resist)
+            a, b = model.get_F_criterion(None)
             print(a,b)
             result[i,0], result[i,1] = a.cpu().detach().numpy(), b.cpu().detach().numpy()
             if np.isnan(result[i,1]):
@@ -91,6 +94,7 @@ if __name__ == '__main__':
             print('processing (%04d)-th image... %s' % (i, img_path))
         save_images(webpage, visuals, img_path, aspect_ratio=opt.aspect_ratio, width=opt.display_winsize, use_wandb=opt.use_wandb)
     print(result.mean(axis=0))
+    print(result[:2000, ...].mean(axis=0))
     #print(result)
     print(result.min(axis=0))
     idx = result.argmin(axis=0)[1]

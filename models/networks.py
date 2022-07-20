@@ -1341,7 +1341,7 @@ class oinnopc_parallel(nn.Module):
         self.convr1 = nn.Conv2d(in_channels=self.refine_channel, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
         self.convr2 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=self.refine_channel//2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
 
-        self.convr3 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=1, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
+        self.convr3 = nn.Conv2d(in_channels=self.refine_channel//2, out_channels=2, kernel_size=self.refine_kernel, padding = (self.refine_kernel-1)//2)
         self.act_fn = nn.LeakyReLU(0.1)
 
         #bypass unet
@@ -1397,8 +1397,8 @@ class oinnopc_parallel(nn.Module):
         x = self.act_fn(x)
         x = self.convr3(x)
 
-
-        return self.tanh(x)
+        return x
+        #return self.tanh(x)
 
 
 

@@ -50,15 +50,15 @@ if __name__ == '__main__':
         # Generate new image with styleGANRF
         print("Generating new images.")
         newDir = "./{}_{}_{}/iter_{}".format(opt.augmode, opt.rank_buffer_size, opt.aug_iter, i)
-        mkdir(newDir)
-        res = stylegan.generate_data(newDir, model, opt.augmode)
-        with open("./results.txt", 'a') as f:
-            f.write("Generated data with iou_fg of {:.8f}\n".format(sum(res)/len(res)))
+        #mkdir(newDir)
+        #res = stylegan.generate_data(newDir, model, opt.augmode)
+        #with open("./results.txt", 'a') as f:
+        #    f.write("Generated data with iou_fg of {:.8f}\n".format(sum(res)/len(res)))
         opt.dataroot = newDir
         newDataset = create_dataset(opt)
         
         # update buffer dataset
-        bufferDataset.dataset.update(model, newDataset)
+        #bufferDataset.dataset.update(model, newDataset)
         totalDataset.dataset.add(newDataset.dataset)
         
         # Train styleGAN
@@ -67,7 +67,7 @@ if __name__ == '__main__':
         print("Updating GAN model.")
         args.training_set_kwargs.files = bufferDataset.dataset.buffer
         stylegan.finetune(args)
-    
+    print(len(totalDataset))
     # Train DOINN 
     print("Start model retraining on all data {}.".format(len(totalDataset)))
     for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):
