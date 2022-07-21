@@ -46,10 +46,19 @@ if __name__ == '__main__':
     stylegan.setup(opt)
     stylegan.init(args.G_kwargs, args.D_kwargs)
     
+    # initial testing
+    test = []
+    for data in testDataset:
+        cur, _ = model.get_iou(data, True)
+        test += cur
+    with open("./results.txt", 'a') as f:
+        f.write("Running new experiments with {}\n".format(opt.augmode))
+        f.write("Initial model tested with iou_fg of {:.8f}\n".format(sum(test) / len(test)))
+    
     res = []
     for i in range(opt.aug_iter):
         
-        # Generate new image with styleGANRF
+        # Generate new image with styleGAN
         print("Generating new images.")
         newDir = "./{}_{}_{}/iter_{}".format(opt.augmode, opt.rank_buffer_size, opt.aug_iter, i)
         mkdir(newDir)
@@ -65,12 +74,12 @@ if __name__ == '__main__':
     
         # Train DOINN 
         print("Start model retraining on all data {}.".format(len(totalDataset)))
-        #for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):
-        #    for i, data in enumerate(totalDataset):
-        #        model.set_input(data)
-        #        model.optimize_parameters()
-        #    model.update_learning_rate()
-        #model.save_networks("iteration_{}_{}_{}".format(opt.augmode, opt.rank_buffer_size, i))
+        for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):
+            for i, data in enumerate(totalDataset):
+                model.set_input(data)
+                model.optimize_parameters()
+            model.update_learning_rate()
+        model.save_networks("iteration_{}_{}_{}".format(opt.augmode, opt.rank_buffer_size, i))
         
         # Test DOINN
         test = []
@@ -81,6 +90,6 @@ if __name__ == '__main__':
             f.write("Tested with iou_fg of {:.8f}\n".format(sum(test) / len(test)))
             
         # Undo training, reload previous weights
-        #load_suffix = '%d' % opt.load_iter
-        #model.load_networks(load_suffix)
+        load_suffix = '%d' % opt.load_iter
+        model.load_networks(load_suffix)
         
