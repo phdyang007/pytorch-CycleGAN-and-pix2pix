@@ -311,9 +311,12 @@ class StyleGANModel(BaseModel):
             img = self.upsampler(img)
             img = (img + 1) * 0.5
             model.mask = img
-            model.legalize_mask(model.mask)
-            model.forward()
-            _, iou_fg = model.get_F_criterion(None)
+            model.eval()
+            with torch.no_grad():
+                model.legalize_mask(model.mask)
+                model.forward()
+                _, iou_fg = model.get_F_criterion(None)
+            model.train()
             results.append(iou_fg.item())
             mask_golden = (model.real_resist[:,0,:,:] * 255).to(torch.uint8)
             img_output = (img[:,0,:,:] * 255).to(torch.uint8)
@@ -362,9 +365,12 @@ class StyleGANModel(BaseModel):
             z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.z_dim)).to(device)
             img = self.attack_style(z, self.netG, model, device=device) 
             model.mask = img
-            model.legalize_mask(model.mask)
-            model.forward()
-            _, iou_fg = model.get_F_criterion(None)
+            model.eval()
+            with torch.no_grad():
+                model.legalize_mask(model.mask)
+                model.forward()
+                _, iou_fg = model.get_F_criterion(None)
+            model.train()
             results.append(iou_fg.item())
             mask_golden = (model.real_resist[:,0,:,:] * 255).to(torch.uint8)
             img_output = (img[:,0,:,:] * 255).to(torch.uint8)
@@ -419,8 +425,12 @@ class StyleGANModel(BaseModel):
             z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.z_dim)).to(device)
             img = self.attack_noise(z, self.netG, model, device)
             model.mask = img
-            model.forward()
-            _, iou_fg = model.get_F_criterion(None)
+            model.eval()
+            with torch.no_grad():
+                model.legalize_mask(model.mask)
+                model.forward()
+                _, iou_fg = model.get_F_criterion(None)
+            model.train()
             results.append(iou_fg.item())
             img_output = (img[:,0,:,:] * 255).to(torch.uint8)
             mask_golden = (model.real_resist[:,0,:,:] * 255).to(torch.uint8)

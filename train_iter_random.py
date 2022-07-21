@@ -18,6 +18,7 @@ See options/base_options.py and options/train_options.py for more training optio
 See training and test tips at: https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/docs/tips.md
 See frequently asked questions at: https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/docs/qa.md
 """
+import torch
 from options.aug_options import AugOptions
 from data import create_dataset
 from models import create_model
@@ -47,10 +48,13 @@ if __name__ == '__main__':
     stylegan.init(args.G_kwargs, args.D_kwargs)
     
     # initial testing
+    model.eval()
     test = []
     for data in testDataset:
         cur, _ = model.get_iou(data, True)
         test += cur
+    model.train()
+
     with open("./results.txt", 'a') as f:
         f.write("Running new experiments with {}\n".format(opt.augmode))
         f.write("Initial model tested with iou_fg of {:.8f}\n".format(sum(test) / len(test)))
@@ -83,9 +87,11 @@ if __name__ == '__main__':
         
         # Test DOINN
         test = []
+        model.eval()
         for data in testDataset:
             cur, _ = model.get_iou(data, True)
             test += cur
+        model.train()
         with open("./results.txt", 'a') as f:
             f.write("Tested with iou_fg of {:.8f}\n".format(sum(test) / len(test)))
             
