@@ -84,7 +84,11 @@ class StyleGANModel(BaseModel):
             opt (Option class)-- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
         BaseModel.__init__(self, opt)
-        self.generate_num = opt.rank_buffer_size 
+        self.batch = opt.batch_size // 2
+        if opt.rank_buffer_size % self.batch == 0:
+            self.generate_num = opt.rank_buffer_size // self.batch
+        else:
+            self.generate_num = opt.rank_buffer_size // self.batch + 1
         self.upsampler = torch.nn.Upsample(scale_factor=8, mode='bicubic')
         self.seed = 0
         
@@ -294,14 +298,15 @@ class StyleGANModel(BaseModel):
 
     #TODO: get batched generation + multi-gpu
     def generate_random(self, outdir, model):
+        batch = self.batch
         device = torch.device('cuda', 0)
         seeds = list(range(self.seed, self.seed + self.generate_num)) 
         self.seed += self.generate_num
         results = []
-        label = torch.zeros([1, self.netG.c_dim], device=device)
+        label = torch.zeros([batch, self.netG.c_dim], device=device)
         self.netG.to(device)
         for i, seed in enumerate(seeds):
-            z = torch.from_numpy(np.random.RandomState(seed).randn(1, self.netG.z_dim)).to(device)
+            z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.z_dim)).to(device)
             img = self.netG(z, label, truncation_psi=1.0, noise_mode='const')
             img = self.upsampler(img)
             img = (img + 1) * 0.5
@@ -310,17 +315,19 @@ class StyleGANModel(BaseModel):
             model.forward()
             _, iou_fg = model.get_F_criterion(None)
             results.append(iou_fg.item())
-            mask_golden = (model.real_resist[0,0,:,:] * 255).to(torch.uint8)
-            img_output = (img[0,0,:,:] * 255).to(torch.uint8)
-            img_output = torch.cat((img_output,mask_golden), 1)
-            PIL.Image.fromarray(img_output.detach().cpu().numpy(), 'L').save(f'{outdir}/seed{i:04d}.png')
+            mask_golden = (model.real_resist[:,0,:,:] * 255).to(torch.uint8)
+            img_output = (img[:,0,:,:] * 255).to(torch.uint8)
+            img_output = torch.cat((img_output,mask_golden), 2)
+            for b in range(batch):
+                PIL.Image.fromarray(img_output[b,...].detach().cpu().numpy(), 'L').save(f'{outdir}/seed{i:04d}_{b:02d}.png')
         self.netG.cpu()
         return results
     
     def attack_style(self, z, G, model, device, lr_alpha=0.01, dist_norm=0.1, loss_type='houdini', quantize_aware=True, epochs=10, gradient_clip=True):
+        batch = self.batch
         upsampler = torch.nn.Upsample(scale_factor=8, mode='bicubic')
         G.eval(), model.eval()
-        label = torch.zeros([1, G.c_dim], device=device)
+        label = torch.zeros([batch, G.c_dim], device=device)
         optimizer = torch.optim.Adam([z], lr=lr_alpha)
         z.requires_grad = True
         norm_dist = Normal(torch.tensor([0.0], device=device), torch.tensor([1.0], device=device))
@@ -344,33 +351,36 @@ class StyleGANModel(BaseModel):
         return img
     
     def attack_style_loop(self, outdir, model): 
+        batch = self.batch
         device = torch.device('cuda', 0)
         seeds = list(range(self.seed, self.seed + self.generate_num)) 
         self.seed += self.generate_num
         results = []
-        label = torch.zeros([1, self.netG.c_dim], device=device)
+        label = torch.zeros([batch, self.netG.c_dim], device=device)
         self.netG.to(device)
         for i, seed in enumerate(seeds):
-            z = torch.from_numpy(np.random.RandomState(seed).randn(1, self.netG.z_dim)).to(device)
+            z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.z_dim)).to(device)
             img = self.attack_style(z, self.netG, model, device=device) 
             model.mask = img
             model.legalize_mask(model.mask)
             model.forward()
             _, iou_fg = model.get_F_criterion(None)
             results.append(iou_fg.item())
-            mask_golden = (model.real_resist[0,0,:,:] * 255).to(torch.uint8)
-            img_output = (img[0,0,:,:] * 255).to(torch.uint8)
-            img_output = torch.cat((img_output,mask_golden), 1)
-            PIL.Image.fromarray(img_output.detach().cpu().numpy(), 'L').save(f'{outdir}/seed{i:04d}.png')
+            mask_golden = (model.real_resist[:,0,:,:] * 255).to(torch.uint8)
+            img_output = (img[:,0,:,:] * 255).to(torch.uint8)
+            img_output = torch.cat((img_output,mask_golden), 2)
+            for b in range(batch):
+                PIL.Image.fromarray(img_output[b,...].detach().cpu().numpy(), 'L').save(f'{outdir}/seed{i:04d}_{b:02d}.png')
         self.netG.cpu()
         return results
     
     def attack_noise(self, z, G, model, device, lr_alpha=1.0, dist_norm=0.1, quantize_aware=True, epochs=10, gradient_clip=True):
+        batch = self.batch
         noise_module = Noise(G.synthesis.block_resolutions, device)
-        noise, noise_block = noise_module.generate()
+        noise, noise_block = noise_module.generate(batch)
         upsampler = torch.nn.Upsample(scale_factor=8, mode='bicubic')
         G.eval(), model.eval()
-        label = torch.zeros([1, G.c_dim], device=device)
+        label = torch.zeros([batch, G.c_dim], device=device)
         optimizer = torch.optim.Adam([noise], lr=lr_alpha)
         noise.requires_grad = True
         original = None
@@ -398,23 +408,25 @@ class StyleGANModel(BaseModel):
         return img
     
     def attack_noise_loop(self, outdir, model): 
+        batch = self.batch
         device = torch.device('cuda', 0)
         seeds = list(range(self.seed, self.seed + self.generate_num)) 
         self.seed += self.generate_num
         results = []
-        label = torch.zeros([1, self.netG.c_dim], device=device)
+        label = torch.zeros([batch, self.netG.c_dim], device=device)
         self.netG.to(device)
         for i, seed in enumerate(seeds):
-            z = torch.from_numpy(np.random.RandomState(seed).randn(1, self.netG.z_dim)).to(device)
+            z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.z_dim)).to(device)
             img = self.attack_noise(z, self.netG, model, device)
             model.mask = img
             model.forward()
             _, iou_fg = model.get_F_criterion(None)
             results.append(iou_fg.item())
-            img_output = (img[0,0,:,:] * 255).to(torch.uint8)
-            mask_golden = (model.real_resist[0,0,:,:] * 255).to(torch.uint8)
-            img_output = torch.cat((img_output,mask_golden), 1)
-            PIL.Image.fromarray(img_output.detach().cpu().numpy(), 'L').save(f'{outdir}/seed{i:04d}.png')
+            img_output = (img[:,0,:,:] * 255).to(torch.uint8)
+            mask_golden = (model.real_resist[:,0,:,:] * 255).to(torch.uint8)
+            img_output = torch.cat((img_output,mask_golden), 2)
+            for b in range(batch):
+                PIL.Image.fromarray(img_output[b,...].detach().cpu().numpy(), 'L').save(f'{outdir}/seed{i:04d}_{b:02d}.png')
         return results
     
     def generate_data(self, outdir, model, method):

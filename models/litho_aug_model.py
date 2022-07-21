@@ -136,8 +136,10 @@ class LithoAugModel(BaseModel):
         self.loss_F = self.criterionLitho(self.real_mask, self.to_one_hot(self.real_resist))  
         self.loss_F.backward()
         
-    def get_iou(self, data):
+    def get_iou(self, data, relabel=True):
         self.set_input(data)
+        if relabel:
+            self.real_resist = self.legalize_mask(self.simulate(self.mask), 0.5)
         self.forward()
         self.real_mask = self.legalize_mask(self.real_mask_img, 0.5).int()
         self.real_resist = self.real_resist.int()
