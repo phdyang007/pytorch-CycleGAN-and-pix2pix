@@ -37,13 +37,10 @@ def load_network_pkl(f, force_fp16=False):
     # Validate contents.
     assert isinstance(data['G'], torch.nn.Module)
     assert isinstance(data['D'], torch.nn.Module)
-    assert isinstance(data['G_ema'], torch.nn.Module)
-    assert isinstance(data['training_set_kwargs'], (dict, type(None)))
-    assert isinstance(data['augment_pipe'], (torch.nn.Module, type(None)))
-
+    
     # Force FP16.
     if force_fp16:
-        for key in ['G', 'D', 'G_ema']:
+        for key in ['G', 'D']:
             old = data[key]
             kwargs = copy.deepcopy(old.init_kwargs)
             if key.startswith('G'):

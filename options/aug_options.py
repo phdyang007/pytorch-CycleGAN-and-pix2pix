@@ -26,11 +26,11 @@ class AugOptions(BaseOptions):
         # augmentation parameters
         parser.add_argument('--testroot', type=str, default='./../test_all', help='test path for data.')
         parser.add_argument('--augmode', type=str, default='random', help='data augmentation mode. one of random|adv_style|adv_noise|none.')
-        parser.add_argument('--gan_batch_size', type=int, default=256, help='batch size used for finetune styleGAN.')
+        parser.add_argument('--gan_batch_size', type=int, default=32, help='batch size used for finetune styleGAN.')
         parser.add_argument('--augroot', type=str, default='./augmentation', help='directory to save augmented data.')
         parser.add_argument('--gan_model', type=str, default='./stylegan_model/network-snapshot-025000.pkl', help='pickle file for pre-trained styleGAN model.')
         parser.add_argument('--rank_buffer_size', type=int, default=10, help='number of new data generated each augmentation iteration.')
-        parser.add_argument('--aug_kimg', type=int, default=6, help='number of images seen by discriminator in GAN finetune.')
+        parser.add_argument('--gan_epoch', type=int, default=10, help='number of epochs in GAN finetune.')
         parser.add_argument('--aug_iter', type=int, default=1, help='number of augmentation iteration')
         # set training to True
         self.isTrain = True

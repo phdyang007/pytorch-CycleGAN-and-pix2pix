@@ -128,12 +128,12 @@ def mkdir(path):
 
 def get_args_from_opt(opt):
     args = dnnlib.EasyDict()
-    args.num_gpus = len(opt.gpu_ids)
+    args.num_gpus = 1 # default needed.
     args.random_seed = 0
     args.training_set_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderResizeDataset', files=[], use_labels=False, max_size=None, xflip=True)
     args.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, num_workers=8, prefetch_factor=2)
     
-    spec = dnnlib.EasyDict(dict(ref_gpus=args.num_gpus, kimg=opt.aug_kimg, mb=opt.gan_batch_size, mbstd=opt.gan_batch_size*args.num_gpus, fmaps=-1, lrate=-1, gamma=-1, ema=-1, ramp=0.05, map=2))
+    spec = dnnlib.EasyDict(dict(ref_gpus=args.num_gpus, kimg=1, mb=opt.gan_batch_size, mbstd=opt.gan_batch_size*args.num_gpus, fmaps=-1, lrate=-1, gamma=-1, ema=-1, ramp=0.05, map=2))
     res = 256
     spec.fmaps = 1 if res >= 512 else 0.5
     spec.lrate = 0.0002 if res >= 1024 else 0.00025

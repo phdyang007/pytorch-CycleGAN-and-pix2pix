@@ -18,6 +18,7 @@ from torch_utils import training_stats
 from torch_utils.ops import conv2d_gradfix
 from torch_utils.ops import grid_sample_gradfix
 import legacy
+from torch_utils import custom_ops
 from torch.distributions.normal import Normal
 
 def uniform_quantize(k, gradient_clip=False):
@@ -120,6 +121,17 @@ class StyleGANModel(BaseModel):
                 self.subprocess_fn(rank=0, args=args, temp_dir=temp_dir)
             else:
                 torch.multiprocessing.spawn(fn=self.subprocess_fn, args=(args, temp_dir), nprocs=args.num_gpus)
+    
+    def save_model(self, i, args):
+        save_filename = 'stylegan_%d.pkl' % i
+        save_path = os.path.join(self.save_dir, save_filename)
+        snapshot_data = dict(training_set_kwargs=dict(args.training_set_kwargs))
+        for name, module in [('G', self.netG), ('D', self.netD)]:
+            module = copy.deepcopy(module).eval().requires_grad_(False).cpu()
+            snapshot_data[name] = module
+            del module # conserve memory
+        with open(save_path, 'wb') as f:
+             pickle.dump(snapshot_data, f)
 
     def subprocess_fn(self, rank, args, temp_dir):
         # Init torch.distributed.
