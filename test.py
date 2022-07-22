@@ -93,6 +93,9 @@ if __name__ == '__main__':
         if i % 500 == 0:  # save images to an HTML file
             print('processing (%04d)-th image... %s' % (i, img_path))
         save_images(webpage, visuals, img_path, aspect_ratio=opt.aspect_ratio, width=opt.display_winsize, use_wandb=opt.use_wandb)
+    x = result[:,1].tolist()
+    print(sorted(x), sum(x))
+    
     print(result.mean(axis=0))
     print(result[:2000, ...].mean(axis=0))
     #print(result)
