@@ -331,7 +331,7 @@ class StyleGANModel(BaseModel):
             model.train()
             results.append(iou_fg.item())
             mask_golden = (model.real_resist[:,0,:,:] * 255).to(torch.uint8)
-            img_output = (img[:,0,:,:] * 255).to(torch.uint8)
+            img_output = (model.mask[:,0,:,:] * 255).to(torch.uint8)
             img_output = torch.cat((img_output,mask_golden), 2)
             for b in range(batch):
                 PIL.Image.fromarray(img_output[b,...].detach().cpu().numpy(), 'L').save(f'{outdir}/seed{i:04d}_{b:02d}.png')
@@ -385,7 +385,7 @@ class StyleGANModel(BaseModel):
             model.train()
             results.append(iou_fg.item())
             mask_golden = (model.real_resist[:,0,:,:] * 255).to(torch.uint8)
-            img_output = (img[:,0,:,:] * 255).to(torch.uint8)
+            img_output = (model.mask[:,0,:,:] * 255).to(torch.uint8)
             img_output = torch.cat((img_output,mask_golden), 2)
             for b in range(batch):
                 PIL.Image.fromarray(img_output[b,...].detach().cpu().numpy(), 'L').save(f'{outdir}/seed{i:04d}_{b:02d}.png')
@@ -444,7 +444,7 @@ class StyleGANModel(BaseModel):
                 _, iou_fg = model.get_F_criterion(None)
             model.train()
             results.append(iou_fg.item())
-            img_output = (img[:,0,:,:] * 255).to(torch.uint8)
+            img_output = (model.mask[:,0,:,:] * 255).to(torch.uint8)
             mask_golden = (model.real_resist[:,0,:,:] * 255).to(torch.uint8)
             img_output = torch.cat((img_output,mask_golden), 2)
             for b in range(batch):

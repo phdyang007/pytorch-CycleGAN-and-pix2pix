@@ -41,13 +41,6 @@ if __name__ == '__main__':
     model.setup(opt)
     model.load_networks(opt.load_iter)
     
-    # initialize styleGAN model
-    # TODO initialize args
-    opt.model = 'stylegan'
-    stylegan = create_model(opt)
-    stylegan.setup(opt)
-    stylegan.init(args.G_kwargs, args.D_kwargs)
-    
     # initial testing
     model.eval()
     test = []
@@ -73,6 +66,7 @@ if __name__ == '__main__':
         totalDataset.dataset.add(newDataset.dataset)
     
         # Train DOINN 
+        torch.cuda.empty_cache()
         print("Start model retraining on all data {}.".format(len(totalDataset)))
         for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):
             for i, data in enumerate(totalDataset):

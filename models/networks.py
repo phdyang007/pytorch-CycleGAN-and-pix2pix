@@ -800,15 +800,11 @@ class ComplexMul2d(nn.Module):
     
 class ComplexMul2dParallel(nn.Module):
     def __init__(self, in_channels, out_channels, modes1, modes2):
-        # (A+Bi)*(R+Ii) = (AR-BI) + (AI+BR)i
         super(ComplexMul2dParallel, self).__init__()
-        self.A = RealMul2d(in_channels, out_channels, modes1, modes2)
-        self.B = RealMul2d(in_channels, out_channels, modes1, modes2)
+        self.weight = nn.Parameter(torch.empty((in_channels, out_channels, modes1, modes2, 2))) 
     def forward(self, input):
         # input is complex
-        real = self.A(input.real) - self.B(input.imag)
-        imag = self.A(input.imag) + self.B(input.real)
-        return real.type(torch.complex64) + 1j*imag.type(torch.complex64)
+        return torch.einsum("bixy,ioxy->boxy", input, torch.view_as_complex(self.weight))
     
 class ComplexLinear(nn.Module):
     def __init__(self, in_features, out_features):
@@ -821,14 +817,11 @@ class ComplexLinear(nn.Module):
 class ComplexLinearParallel(nn.Module):
     def __init__(self, in_features, out_features):
         super(ComplexLinearParallel, self).__init__()
-        self.fc_r = nn.Linear(in_features, out_features)
-        self.fc_i = nn.Linear(in_features, out_features)
-    def apply_complex(self, fr, fi, input, dtype=torch.complex64):
-         return (fr(input.real)-fi(input.imag)).type(dtype) \
-            + 1j*(fr(input.imag)+fi(input.real)).type(dtype)
+        self.weight = nn.Parameter(torch.empty((out_features, in_features, 2)))
+        self.bias = nn.Parameter(torch.empty((out_features, 2)))
     def forward(self, input):
         # input is complex
-        return self.apply_complex(self.fc_r, self.fc_i, input)
+        return torch.nn.functional.linear(input, torch.view_as_complex(self.weight), torch.view_as_complex(self.bias))
 
 class SpectralConv2d(nn.Module):
     def __init__(self, in_channels, out_channels, modes1, modes2):
