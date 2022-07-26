@@ -192,7 +192,6 @@ class LithoAugModel(BaseModel):
         self.union = union_fg
         #self.iou_fg = intersection_fg.sum()/union_fg.sum()
         self.iou_fg = (intersection_fg.sum(dim=(1,2,3)) + 1e-3) / (union_fg.sum(dim=(1,2,3)) + 1e-3)
-        print(self.iou_fg.shape, loss.shape)
         #print(self.iou_fg) # here prints
         #self.iou_bg = (1-union_fg).sum()/(1-intersection_fg).sum()
         #self.iou = (self.iou_bg + self.iou_fg)/2.0
