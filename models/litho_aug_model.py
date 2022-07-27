@@ -127,8 +127,8 @@ class LithoAugModel(BaseModel):
         x = x.squeeze(1).to(torch.int64)
         return torch.nn.functional.one_hot(x,num_classes=2).permute((0,3,1,2)).float()
         
-    def forward(self):
-        self.real_mask, self.embedding, self.loss_predict = self.netF(self.mask)
+    def forward(self, detach=False):
+        self.real_mask, self.embedding, self.loss_predict = self.netF(self.mask, detach)
         self.real_mask_img = torch.argmax(self.real_mask, dim=1, keepdim=True)
 
     def forward_attack(self, original=None):
@@ -151,7 +151,7 @@ class LithoAugModel(BaseModel):
         elif loss_type == 'mse':
             return self.MSELoss(self.real_mask[...,0], self.real_mask[...,1])
         elif loss_type == 'predict':
-            return self.loss_predict.mean()
+            return -self.loss_predict.mean()
         else:
             assert False, "{} not supported".format(loss_type)
         
@@ -159,7 +159,7 @@ class LithoAugModel(BaseModel):
         #print(self.real_mask.shape, self.to_one_hot(self.real_resist).shape)
         self.loss_F = self.criterionLitho(self.real_mask, self.to_one_hot(self.real_resist)).mean(dim=(1,2))
         self.loss_predict = self.loss_predict.reshape(self.loss_F.shape)
-        self.loss_loss_predict = LossPredLoss(self.loss_predict, self.loss_F)
+        self.loss_loss_predict = LossPredLoss(self.loss_predict, self.loss_F) * 0.1
         self.loss_F = self.loss_F.mean()
         self.loss_all = self.loss_F + self.loss_loss_predict
         self.loss_all.backward()
@@ -197,9 +197,9 @@ class LithoAugModel(BaseModel):
         #self.iou = (self.iou_bg + self.iou_fg)/2.0
         return loss, self.iou_fg.mean()
     
-    def optimize_parameters(self):
+    def optimize_parameters(self, detach=True):
         self.set_requires_grad(self.netF, True)
-        self.forward()
+        self.forward(detach)
         self.optimizer_F.zero_grad()
         self.backward()
         self.optimizer_F.step()

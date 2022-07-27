@@ -1362,7 +1362,7 @@ class oinnopc_parallel(nn.Module):
         self.fc_1000 = nn.Linear(256,256)
         self.loss_output = nn.Linear(1024,1)
 
-    def forward(self, x):
+    def forward(self, x, detach=False):
 
         #fno pass
         x_fno = self.resize0(x) 
@@ -1381,22 +1381,29 @@ class oinnopc_parallel(nn.Module):
         x = torch.cat((x_fno, x_unet_250), 1)
         
         # loss part
-        l_fno = x_fno.detach()
+        if detach:
+            l_fno = x_fno.detach()
+            l_250 = x_unet_250.detach()
+            l_500 = x_unet_500.detach()
+            l_1000 = x_unet_1000.detach()
+        else:
+            l_fno = x_fno
+            l_250 = x_unet_250
+            l_500 = x_unet_500
+            l_1000 = x_unet_1000
+            
         l_fno = self.gap_fno(l_fno)
         l_fno = l_fno.view(l_fno.size(0), -1)
         l_fno = self.act_fn(self.fc_fno(l_fno))
         
-        l_250 = x_unet_250.detach()
         l_250 = self.gap_250(l_250)
         l_250 = l_250.view(l_250.size(0), -1)
         l_250 = self.act_fn(self.fc_250(l_250))
         
-        l_500 = x_unet_500.detach()
         l_500 = self.gap_500(l_500)
         l_500 = l_500.view(l_500.size(0), -1)
         l_500 = self.act_fn(self.fc_500(l_500))
         
-        l_1000 = x_unet_1000.detach()
         l_1000 = self.gap_1000(x_unet_1000)
         l_1000 = l_1000.view(l_1000.size(0), -1)
         l_1000 = self.act_fn(self.fc_1000(l_1000))

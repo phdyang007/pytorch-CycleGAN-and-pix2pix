@@ -54,6 +54,7 @@ if __name__ == '__main__':
         f.write("Initial model tested with iou_fg of {:.8f}\n".format(sum(test) / len(test)))
     
     res = []
+    all_train_iterations = [0,1,2,3,7]
     for iter in range(opt.aug_iter):
         
         # Generate new image with styleGAN
@@ -65,13 +66,14 @@ if __name__ == '__main__':
         # update buffer dataset
         totalDataset.dataset.add(newDataset.dataset)
     
+        if iter not in all_train_iterations:
+            continue
         # Train DOINN 
-        torch.cuda.empty_cache()
         print("Start model retraining on all data {}.".format(len(totalDataset)))
         for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):
             for i, data in enumerate(totalDataset):
                 model.set_input(data)
-                model.optimize_parameters()
+                model.optimize_parameters(detach=True)
             model.update_learning_rate()
         model.save_networks("iteration_{}_{}_{}".format(opt.augmode, opt.rank_buffer_size, iter))
         
