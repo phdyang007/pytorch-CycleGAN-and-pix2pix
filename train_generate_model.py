@@ -70,6 +70,7 @@ if __name__ == '__main__':
             # load model it should already exists. also data should as well. 
             model.load_networks("iteration_{}_{}_{}".format(opt.augmode, opt.rank_buffer_size, iter))
         else:
+            mkdir(newDir)
             res = stylegan.generate_data(newDir, model, opt.augmode)
             with open("./results.txt", 'a') as f:
                 f.write("Generated data of size {:02d} with iou_fg of {:.8f}\n".format(len(res),  sum(res)/len(res)))
