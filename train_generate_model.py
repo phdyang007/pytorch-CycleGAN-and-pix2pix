@@ -68,7 +68,7 @@ if __name__ == '__main__':
         # skip generation for 0 iter since it should already exist from previous
         if iter == 0:
             # load model it should already exists. also data should as well. 
-            model.save_networks("iteration_{}_{}_{}".format(opt.augmode, opt.rank_buffer_size, iter))
+            model.load_networks("iteration_{}_{}_{}".format(opt.augmode, opt.rank_buffer_size, iter))
         else:
             res = stylegan.generate_data(newDir, model, opt.augmode)
             with open("./results.txt", 'a') as f:
@@ -103,7 +103,7 @@ if __name__ == '__main__':
             f.write("Tested with iou_fg of {:.8f}\n".format(sum(test) / len(test)))
             
         # Undo training, reload previous weights
-        model.setup(opt)
+        model.setup(opt, load=False)
         # no need to reload previous weights.
         #model.load_networks(opt.load_iter) 
 
