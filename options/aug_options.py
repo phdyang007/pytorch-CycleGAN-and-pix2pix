@@ -24,7 +24,7 @@ class AugOptions(BaseOptions):
         parser.add_argument('--lr_policy', type=str, default='linear', help='learning rate policy. [linear | step | plateau | cosine]')
         parser.add_argument('--lr_decay_iters', type=int, default=50, help='multiply by a gamma every lr_decay_iters iterations')
         # augmentation parameters
-        parser.add_argument('--testroot', type=str, default='./../test_all', help='test path for data.')
+        parser.add_argument('--testroot', type=str, default='./test_all', help='test path for data.')
         parser.add_argument('--augmode', type=str, default='random', help='data augmentation mode. one of random|adv_style|adv_noise|none.')
         parser.add_argument('--gan_batch_size', type=int, default=32, help='batch size used for finetune styleGAN.')
         parser.add_argument('--augroot', type=str, default='./augmentation', help='directory to save augmented data.')

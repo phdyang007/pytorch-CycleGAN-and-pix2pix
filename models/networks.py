@@ -1352,14 +1352,15 @@ class oinnopc_parallel(nn.Module):
         self.vgg5 = VGGBlock(self.vgg_channels[5])
         
         # loss network
-        self.gap_fno = nn.AvgPool2d(64) #256
-        self.gap_250 = nn.AvgPool2d(64) #256
-        self.gap_500 = nn.AvgPool2d(128) #128
-        self.gap_1000 = nn.AvgPool2d(128) #256
-        self.fc_fno = nn.Linear(256,256)
-        self.fc_250 = nn.Linear(256,256)
-        self.fc_500 = nn.Linear(128, 256)
-        self.fc_1000 = nn.Linear(256,256)
+        self.avgpool = nn.AdaptiveAvgPool2d((1,1))
+        #self.gap_fno = nn.AvgPool2d(64) #256
+        #self.gap_250 = nn.AvgPool2d(64) #256
+        #self.gap_500 = nn.AvgPool2d(128) #128
+        #self.gap_1000 = nn.AvgPool2d(128) #256
+        self.fc_fno = nn.Linear(16,256)
+        self.fc_250 = nn.Linear(16,256)
+        self.fc_500 = nn.Linear(8, 256)
+        self.fc_1000 = nn.Linear(4,256)
         self.loss_output = nn.Linear(1024,1)
 
     def forward(self, x, detach=False):
@@ -1392,20 +1393,20 @@ class oinnopc_parallel(nn.Module):
             l_500 = x_unet_500
             l_1000 = x_unet_1000
             
-        l_fno = self.gap_fno(l_fno)
-        l_fno = l_fno.view(l_fno.size(0), -1)
+        l_fno = self.avgpool(l_fno)
+        l_fno = torch.flatten(l_fno, 1)
         l_fno = self.act_fn(self.fc_fno(l_fno))
         
-        l_250 = self.gap_250(l_250)
-        l_250 = l_250.view(l_250.size(0), -1)
+        l_250 = self.avgpool(l_250)
+        l_250 = torch.flatten(l_250, 1)
         l_250 = self.act_fn(self.fc_250(l_250))
         
-        l_500 = self.gap_500(l_500)
-        l_500 = l_500.view(l_500.size(0), -1)
+        l_500 = self.avgpool(l_500)
+        l_500 = torch.flatten(l_500, 1)
         l_500 = self.act_fn(self.fc_500(l_500))
         
-        l_1000 = self.gap_1000(x_unet_1000)
-        l_1000 = l_1000.view(l_1000.size(0), -1)
+        l_1000 = self.avgpool(l_1000)
+        l_1000 = torch.flatten(l_1000, 1)
         l_1000 = self.act_fn(self.fc_1000(l_1000))
         
         l_embedding = torch.cat((l_fno, l_250, l_500, l_1000), 1)
