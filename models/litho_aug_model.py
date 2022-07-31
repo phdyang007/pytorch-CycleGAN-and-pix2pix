@@ -138,7 +138,7 @@ class LithoAugModel(BaseModel):
         else:
             self.real_resist = original
         self.loss_F = self.criterionLitho(self.real_mask, self.to_one_hot(self.real_resist))  
-        return self.loss_F
+        return self.loss_F.mean()
         
     def forward_uncertainty(self, loss_type):
         self.forward()
