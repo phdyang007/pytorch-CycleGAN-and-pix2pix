@@ -13,6 +13,7 @@ See our template dataset class 'template_dataset.py' for more details.
 import importlib
 import torch.utils.data
 from data.base_dataset import BaseDataset
+import numpy, random
 
 
 def find_dataset_using_name(dataset_name):
@@ -59,6 +60,11 @@ def create_dataset(opt):
     return dataset
 
 
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    numpy.random.seed(worker_seed)
+    random.seed(worker_seed)
+
 class CustomDatasetDataLoader():
     """Wrapper class of Dataset class that performs multi-threaded data loading"""
 
@@ -72,19 +78,25 @@ class CustomDatasetDataLoader():
         dataset_class = find_dataset_using_name(opt.dataset_mode)
         self.dataset = dataset_class(opt)
         print("dataset [%s] was created" % type(self.dataset).__name__)
+        self.g = torch.Generator()
+        self.g.manual_seed(opt.random_seed)
         if len(self.dataset) > 0:
             self.dataloader = torch.utils.data.DataLoader(
                 self.dataset,
                 batch_size=opt.batch_size,
                 shuffle=not opt.serial_batches,
-                num_workers=int(opt.num_threads))
+                num_workers=int(opt.num_threads),
+                worker_init_fn=seed_worker,
+                generator=self.g)
             
     def setup_dataloader(self):
          self.dataloader = torch.utils.data.DataLoader(
             self.dataset,
             batch_size=opt.batch_size,
             shuffle=not opt.serial_batches,
-            num_workers=int(opt.num_threads))
+            num_workers=int(opt.num_threads),
+            worker_init_fn=seed_worker,
+            generator=self.g)
             
     def load_data(self):
         return self
