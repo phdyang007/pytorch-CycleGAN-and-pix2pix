@@ -70,11 +70,10 @@ if __name__ == '__main__':
         if iter == 0:
             # load model it should already exists. also data should as well. 
             model.load_networks(opt.load_iter)
-        else:
-            mkdir(newDir)
-            res = stylegan.generate_data(newDir, model, opt.augmode)
-            with open("./results.txt", 'a') as f:
-                f.write("Generated data of size {:02d} with iou_fg of {:.8f}\n".format(len(res),  sum(res)/len(res)))
+        mkdir(newDir)
+        res = stylegan.generate_data(newDir, model, opt.augmode)
+        with open("./results.txt", 'a') as f:
+            f.write("Generated data of size {:02d} with iou_fg of {:.8f}\n".format(len(res),  sum(res)/len(res)))
         opt.dataroot = newDir
         newDataset = create_dataset(opt)
         

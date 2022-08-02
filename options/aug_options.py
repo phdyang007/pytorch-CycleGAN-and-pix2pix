@@ -33,7 +33,6 @@ class AugOptions(BaseOptions):
         parser.add_argument('--gan_epoch', type=int, default=10, help='number of epochs in GAN finetune.')
         parser.add_argument('--aug_iter', type=int, default=16, help='number of augmentation iteration')
         parser.add_argument('--adv_loss_type', type=str, default='houdini', help='loss type for adv_style. TOD|houdini|mse|logprob|predict|pixel')
-        parser.add_argument('--random_seed', type=int, default=42, help='random seed')
         # set training to True
         self.isTrain = True
         return parser
