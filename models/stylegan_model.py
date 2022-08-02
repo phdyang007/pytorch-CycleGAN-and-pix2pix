@@ -338,7 +338,7 @@ class StyleGANModel(BaseModel):
         self.netG.cpu()
         return results
     
-    def attack_style(self, z, G, model, device, lr_alpha=0.01, dist_norm=0.1, loss_type='houdini', quantize_aware=True, epochs=10, gradient_clip=True):
+    def attack_style(self, z, G, model, device, past_model=None, lr_alpha=0.01, dist_norm=0.1, loss_type='houdini', quantize_aware=True, epochs=10, gradient_clip=True):
         batch = self.batch
         upsampler = torch.nn.Upsample(scale_factor=8, mode='bicubic')
         G.eval(), model.eval()
@@ -356,16 +356,25 @@ class StyleGANModel(BaseModel):
             else:
                 img = model.legalize_mask(img, 0)
             img = (img + 1 ) * 0.5
-            model.mask = img
-            if dist_norm > 1e-5:
-                loss = model.forward_uncertainty(loss_type) - dist_norm * norm_dist.log_prob(z).mean()
+            if loss_type == 'TOD':
+                model.mask = img
+                model.forward()
+                model_loss = model.criterionLitho(model.real_mask, model.to_one_hot(model.real_resist)).mean(dim=(1,2))
+                past_model.mask = img
+                past_model.forward()
+                past_model_loss = past_model.criterionLitho(past_model.real_mask, past_model.to_one_hot(past_model.real_resist)).mean(dim=(1,2))
+                loss = torch.abs(model_loss - past_model_loss).mean()
             else:
-                loss = model.forward_uncertainty(loss_type)
+                model.mask = img
+                if dist_norm > 1e-5:
+                    loss = model.forward_uncertainty(loss_type) - dist_norm * norm_dist.log_prob(z).mean()
+                else:
+                    loss = model.forward_uncertainty(loss_type)
             loss.backward()
             optimizer.step()
         return img
     
-    def attack_style_loop(self, outdir, model): 
+    def attack_style_loop(self, outdir, model, past_model=None): 
         batch = self.batch
         device = torch.device('cuda', 0)
         seeds = list(range(self.seed, self.seed + self.generate_num)) 
@@ -375,7 +384,7 @@ class StyleGANModel(BaseModel):
         self.netG.to(device)
         for i, seed in enumerate(seeds):
             z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.z_dim)).to(device)
-            img = self.attack_style(z, self.netG, model, device=device, loss_type=self.opt.style_loss_type) 
+            img = self.attack_style(z, self.netG, model, device=device, loss_type=self.opt.style_loss_type, past_model=past_model) 
             model.mask = img
             model.eval()
             with torch.no_grad():
@@ -392,7 +401,7 @@ class StyleGANModel(BaseModel):
         self.netG.cpu()
         return results
     
-    def attack_noise(self, z, G, model, device, lr_alpha=1.0, dist_norm=0.1, quantize_aware=True, epochs=10, gradient_clip=True, loss_type='pixel'):
+    def attack_noise(self, z, G, model, device, past_model=None, lr_alpha=1.0, dist_norm=0.1, quantize_aware=True, epochs=10, gradient_clip=True, loss_type='pixel'):
         batch = self.batch
         noise_module = Noise(G.synthesis.block_resolutions, device)
         noise, noise_block = noise_module.generate(batch)
@@ -414,24 +423,33 @@ class StyleGANModel(BaseModel):
             else:
                 img = model.legalize_mask(img, 0)
             img = (img + 1) * 0.5
-            model.mask = img
-            if loss_type == 'pixel':
-                if dist_norm > 1e-5:
-                    loss = -model.forward_attack(original) - dist_norm * norm_dist.log_prob(noise).mean()
-                else:
-                    loss = -model.forward_attack(original)
+            if loss_type == 'TOD':
+                model.mask = img
+                model.forward()
+                model_loss = model.criterionLitho(model.real_mask, model.to_one_hot(model.real_resist)).mean(dim=(1,2))
+                past_model.mask = img
+                past_model.forward()
+                past_model_loss = past_model.criterionLitho(past_model.real_mask, past_model.to_one_hot(past_model.real_resist)).mean(dim=(1,2))
+                loss = torch.abs(model_loss - past_model_loss).mean()
             else:
-                if dist_norm > 1e-5:
-                    loss = model.forward_uncertainty(loss_type) - dist_norm * norm_dist.log_prob(noise).mean()
+                model.mask = img
+                if loss_type == 'pixel':
+                    if dist_norm > 1e-5:
+                        loss = -model.forward_attack(original) - dist_norm * norm_dist.log_prob(noise).mean()
+                    else:
+                        loss = -model.forward_attack(original)
                 else:
-                    loss = model.forward_uncertainty(loss_type)
-            if original is None:
-                original = model.real_resist.detach()
+                    if dist_norm > 1e-5:
+                        loss = model.forward_uncertainty(loss_type) - dist_norm * norm_dist.log_prob(noise).mean()
+                    else:
+                        loss = model.forward_uncertainty(loss_type)
+                if original is None:
+                    original = model.real_resist.detach()
             loss.backward()
             optimizer.step()
         return img
     
-    def attack_noise_loop(self, outdir, model): 
+    def attack_noise_loop(self, outdir, model, past_model=None): 
         batch = self.batch
         device = torch.device('cuda', 0)
         seeds = list(range(self.seed, self.seed + self.generate_num)) 
@@ -441,7 +459,7 @@ class StyleGANModel(BaseModel):
         self.netG.to(device)
         for i, seed in enumerate(seeds):
             z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.z_dim)).to(device)
-            img = self.attack_noise(z, self.netG, model, device, loss_type=self.opt.noise_loss_type)
+            img = self.attack_noise(z, self.netG, model, device, loss_type=self.opt.noise_loss_type, past_model=past_model)
             model.mask = img
             model.eval()
             with torch.no_grad():
@@ -457,11 +475,11 @@ class StyleGANModel(BaseModel):
                 PIL.Image.fromarray(img_output[b,...].detach().cpu().numpy(), 'L').save(f'{outdir}/seed{i:04d}_{b:02d}.png')
         return results
     
-    def generate_data(self, outdir, model, method):
+    def generate_data(self, outdir, model, method, past_model=None):
         if method == 'adv_style':
-            return self.attack_style_loop(outdir, model)
+            return self.attack_style_loop(outdir, model, past_model)
         if method == 'adv_noise':
-            return self.attack_noise_loop(outdir, model)
+            return self.attack_noise_loop(outdir, model, past_model)
         if method == 'random':
             return self.generate_random(outdir, model)
         assert False, "{} not supported".format(method)

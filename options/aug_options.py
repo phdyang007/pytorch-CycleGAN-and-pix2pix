@@ -32,8 +32,8 @@ class AugOptions(BaseOptions):
         parser.add_argument('--rank_buffer_size', type=int, default=10, help='number of new data generated each augmentation iteration.')
         parser.add_argument('--gan_epoch', type=int, default=10, help='number of epochs in GAN finetune.')
         parser.add_argument('--aug_iter', type=int, default=1, help='number of augmentation iteration')
-        parser.add_argument('--style_loss_type', type=str, default='houdini', help='loss type for adv_style. houdini|mse|logprob|predict')
-        parser.add_argument('--noise_loss_type', type=str, default='houdini', help='loss type for adv_style. pixel|houdini|mse|logprob|predict')
+        parser.add_argument('--style_loss_type', type=str, default='houdini', help='loss type for adv_style. TOD|houdini|mse|logprob|predict')
+        parser.add_argument('--noise_loss_type', type=str, default='pixel', help='loss type for adv_style. TOD|pixel|houdini|mse|logprob|predict')
         # set training to True
         self.isTrain = True
         return parser
