@@ -76,7 +76,7 @@ if __name__ == '__main__':
         if iter == 0:
             res = stylegan.generate_data(newDir, model, 'random')
         else:
-            res = stylegan.generate_data_TOD(newDir, model, model_past)
+            res = stylegan.generate_data(newDir, model, opt.augmode, model_past)
         with open("./results.txt", 'a') as f:
             f.write("Generated data of size {:02d} with iou_fg of {:.8f}\n".format(len(res),  sum(res)/len(res)))
         opt.dataroot = newDir

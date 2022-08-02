@@ -359,10 +359,11 @@ class StyleGANModel(BaseModel):
             if loss_type == 'TOD':
                 model.mask = img
                 model.forward()
-                model_loss = model.criterionLitho(model.real_mask, model.to_one_hot(model.real_resist)).mean(dim=(1,2))
+                real_resist = model.simulate(model.mask)
+                model_loss = model.criterionLitho(model.real_mask, model.to_one_hot(real_resist))
                 past_model.mask = img
                 past_model.forward()
-                past_model_loss = past_model.criterionLitho(past_model.real_mask, past_model.to_one_hot(past_model.real_resist)).mean(dim=(1,2))
+                past_model_loss = past_model.criterionLitho(past_model.real_mask, past_model.to_one_hot(real_resist))
                 loss = torch.abs(model_loss - past_model_loss).mean()
             else:
                 model.mask = img
@@ -426,10 +427,11 @@ class StyleGANModel(BaseModel):
             if loss_type == 'TOD':
                 model.mask = img
                 model.forward()
-                model_loss = model.criterionLitho(model.real_mask, model.to_one_hot(model.real_resist)).mean(dim=(1,2))
+                real_resist = model.simulate(model.mask)
+                model_loss = model.criterionLitho(model.real_mask, model.to_one_hot(real_resist))
                 past_model.mask = img
                 past_model.forward()
-                past_model_loss = past_model.criterionLitho(past_model.real_mask, past_model.to_one_hot(past_model.real_resist)).mean(dim=(1,2))
+                past_model_loss = past_model.criterionLitho(past_model.real_mask, past_model.to_one_hot(real_resist))
                 loss = torch.abs(model_loss - past_model_loss).mean()
             else:
                 model.mask = img
