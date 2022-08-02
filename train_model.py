@@ -54,7 +54,7 @@ if __name__ == '__main__':
         f.write("Initial model tested with iou_fg of {:.8f}\n".format(sum(test) / len(test)))
     
     res = []
-    all_train_iterations = [0,1,2,3,7]
+    all_train_iterations = [0,1,2,3,7,11,15]
     for iter in range(opt.aug_iter):
         
         # Generate new image with styleGAN

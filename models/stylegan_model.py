@@ -392,7 +392,7 @@ class StyleGANModel(BaseModel):
         self.netG.cpu()
         return results
     
-    def attack_noise(self, z, G, model, device, lr_alpha=1.0, dist_norm=0.1, quantize_aware=True, epochs=10, gradient_clip=True):
+    def attack_noise(self, z, G, model, device, lr_alpha=1.0, dist_norm=0.1, quantize_aware=True, epochs=10, gradient_clip=True, loss_type='pixel'):
         batch = self.batch
         noise_module = Noise(G.synthesis.block_resolutions, device)
         noise, noise_block = noise_module.generate(batch)
@@ -415,10 +415,16 @@ class StyleGANModel(BaseModel):
                 img = model.legalize_mask(img, 0)
             img = (img + 1) * 0.5
             model.mask = img
-            if dist_norm > 1e-5:
-                loss = -model.forward_attack(original) - dist_norm * norm_dist.log_prob(noise).mean()
+            if loss_type == 'pixel':
+                if dist_norm > 1e-5:
+                    loss = -model.forward_attack(original) - dist_norm * norm_dist.log_prob(noise).mean()
+                else:
+                    loss = -model.forward_attack(original)
             else:
-                loss = -model.forward_attack(original)
+                if dist_norm > 1e-5:
+                    loss = model.forward_uncertainty(loss_type) - dist_norm * norm_dist.log_prob(noise).mean()
+                else:
+                    loss = model.forward_uncertainty(loss_type)
             if original is None:
                 original = model.real_resist.detach()
             loss.backward()
@@ -435,7 +441,7 @@ class StyleGANModel(BaseModel):
         self.netG.to(device)
         for i, seed in enumerate(seeds):
             z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.z_dim)).to(device)
-            img = self.attack_noise(z, self.netG, model, device)
+            img = self.attack_noise(z, self.netG, model, device, loss_type=self.opt.noise_loss_type)
             model.mask = img
             model.eval()
             with torch.no_grad():
