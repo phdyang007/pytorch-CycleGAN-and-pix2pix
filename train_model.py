@@ -22,11 +22,11 @@ import torch
 from options.aug_options import AugOptions
 from data import create_dataset
 from models import create_model
-from util.util import mkdir, get_args_from_opt
+from util.util import mkdir, get_args_from_opt, set_seed
 
 if __name__ == '__main__':
     opt = AugOptions().parse()   # get training options
-    torch.manual_seed(opt.random_seed)
+    set_seed(opt.random_seed)
     dataset_mode = opt.dataset_mode
     args = get_args_from_opt(opt)
     

@@ -24,10 +24,11 @@ from options.train_options import TrainOptions
 from data import create_dataset
 from models import create_model
 from util.visualizer import Visualizer
+from util.util import set_seed
 
 if __name__ == '__main__':
     opt = TrainOptions().parse()   # get training options
-    torch.manual_seed(opt.random_seed)
+    set_seed(opt.random_seed)
     dataset = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options
     dataset_size = len(dataset)    # get the number of images in the dataset.
     print('The number of training images = %d' % dataset_size)
