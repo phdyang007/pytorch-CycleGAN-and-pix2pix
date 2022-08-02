@@ -29,11 +29,11 @@ class AugOptions(BaseOptions):
         parser.add_argument('--gan_batch_size', type=int, default=32, help='batch size used for finetune styleGAN.')
         parser.add_argument('--augroot', type=str, default='./augmentation', help='directory to save augmented data.')
         parser.add_argument('--gan_model', type=str, default='./stylegan_model/network-snapshot-025000.pkl', help='pickle file for pre-trained styleGAN model.')
-        parser.add_argument('--rank_buffer_size', type=int, default=10, help='number of new data generated each augmentation iteration.')
+        parser.add_argument('--rank_buffer_size', type=int, default=2000, help='number of new data generated each augmentation iteration.')
         parser.add_argument('--gan_epoch', type=int, default=10, help='number of epochs in GAN finetune.')
-        parser.add_argument('--aug_iter', type=int, default=1, help='number of augmentation iteration')
-        parser.add_argument('--style_loss_type', type=str, default='houdini', help='loss type for adv_style. TOD|houdini|mse|logprob|predict')
-        parser.add_argument('--noise_loss_type', type=str, default='pixel', help='loss type for adv_style. TOD|pixel|houdini|mse|logprob|predict')
+        parser.add_argument('--aug_iter', type=int, default=16, help='number of augmentation iteration')
+        parser.add_argument('--adv_loss_type', type=str, default='houdini', help='loss type for adv_style. TOD|houdini|mse|logprob|predict|pixel')
+        parser.add_argument('--random_seed', type=int, default=42, help='random seed')
         # set training to True
         self.isTrain = True
         return parser

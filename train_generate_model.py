@@ -26,6 +26,7 @@ from util.util import mkdir, get_args_from_opt
 
 if __name__ == '__main__':
     opt = AugOptions().parse()   # get training options
+    torch.manual_seed(opt.random_seed)
     dataset_mode = opt.dataset_mode
     args = get_args_from_opt(opt)
     
@@ -56,7 +57,7 @@ if __name__ == '__main__':
     model.train()
 
     with open("./results.txt", 'a') as f:
-        f.write("Running new experiments with {}\n".format(opt.augmode))
+        f.write("Running new experiments with {} for iterative active learning\n".format(opt.augmode))
         f.write("Initial model tested with iou_fg of {:.8f}\n".format(sum(test) / len(test)))
     
     all_train_iterations = [0,1,2,3,7,11,15]
@@ -64,11 +65,11 @@ if __name__ == '__main__':
         
         # Generate new image with styleGAN
         print("Obtaining new images on iterations {:02d}".format(iter))
-        newDir = "./{}_{}_{}/iter_{}".format(opt.augmode, opt.rank_buffer_size, opt.aug_iter, iter)
+        newDir = "./{}_{}_{}_{}/iter_{}".format(opt.augmode, opt.adv_loss_type, opt.rank_buffer_size, opt.aug_iter, iter)
         # skip generation for 0 iter since it should already exist from previous
         if iter == 0:
             # load model it should already exists. also data should as well. 
-            model.load_networks("iteration_{}_{}_{}".format(opt.augmode, opt.rank_buffer_size, iter))
+            model.load_networks(opt.load_iter)
         else:
             mkdir(newDir)
             res = stylegan.generate_data(newDir, model, opt.augmode)
@@ -84,14 +85,13 @@ if __name__ == '__main__':
             continue
         # Train DOINN 
 
-        if iter != 0:
-            print("Start model retraining on all data {}.".format(len(totalDataset)))
-            for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):
-                for i, data in enumerate(totalDataset):
-                    model.set_input(data)
-                    model.optimize_parameters(detach=True)
-                model.update_learning_rate()
-            model.save_networks("iteration_{}_{}_{}".format(opt.augmode, opt.rank_buffer_size, iter))
+        print("Start model retraining on all data {}.".format(len(totalDataset)))
+        for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):
+            for i, data in enumerate(totalDataset):
+                model.set_input(data)
+                model.optimize_parameters(detach=True)
+            model.update_learning_rate()
+        model.save_networks("iteration_{}_{}_{}_{}".format(opt.augmode, opt.adv_loss_type, opt.rank_buffer_size, iter))
         
         # Test DOINN
         test = []
@@ -101,9 +101,9 @@ if __name__ == '__main__':
             test += cur
         model.train()
         with open("./results.txt", 'a') as f:
-            f.write("Tested with iou_fg of {:.8f}\n".format(sum(test) / len(test)))
+            f.write("Tested with iou_fg of {:.8f} on iteration {:02d}\n".format(sum(test) / len(test), iter))
             
-        # Undo training, reload previous weights
+        # Update schedulers
         model.setup(opt, load=False)
         # no need to reload previous weights.
         #model.load_networks(opt.load_iter) 

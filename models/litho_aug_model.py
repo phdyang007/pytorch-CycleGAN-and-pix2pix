@@ -58,7 +58,7 @@ class LithoAugModel(BaseModel):
         By default, we use vanilla GAN loss, UNet with batchnorm, and aligned datasets.
         """
         # changing the default values to match the pix2pix paper (https://phillipi.github.io/pix2pix/)
-        parser.add_argument('--netF', type=str, default='oinnopc_seg', help='specify litho architecture [oinnopc]')
+        parser.add_argument('--netF', type=str, default='oinnopc_parallel', help='specify litho architecture [oinnopc]')
         return parser
 
     def __init__(self, opt):

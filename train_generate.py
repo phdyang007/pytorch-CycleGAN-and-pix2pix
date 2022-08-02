@@ -26,6 +26,7 @@ from util.util import mkdir, get_args_from_opt
 
 if __name__ == '__main__':
     opt = AugOptions().parse()   # get training options
+    torch.manual_seed(opt.random_seed)
     dataset_mode = opt.dataset_mode
     args = get_args_from_opt(opt)
     

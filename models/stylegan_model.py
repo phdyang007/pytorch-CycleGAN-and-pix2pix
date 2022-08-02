@@ -384,7 +384,7 @@ class StyleGANModel(BaseModel):
         self.netG.to(device)
         for i, seed in enumerate(seeds):
             z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.z_dim)).to(device)
-            img = self.attack_style(z, self.netG, model, device=device, loss_type=self.opt.style_loss_type, past_model=past_model) 
+            img = self.attack_style(z, self.netG, model, device=device, loss_type=self.opt.adv_loss_type, past_model=past_model) 
             model.mask = img
             model.eval()
             with torch.no_grad():
@@ -459,7 +459,7 @@ class StyleGANModel(BaseModel):
         self.netG.to(device)
         for i, seed in enumerate(seeds):
             z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.z_dim)).to(device)
-            img = self.attack_noise(z, self.netG, model, device, loss_type=self.opt.noise_loss_type, past_model=past_model)
+            img = self.attack_noise(z, self.netG, model, device, loss_type=self.opt.adv_loss_type, past_model=past_model)
             model.mask = img
             model.eval()
             with torch.no_grad():
