@@ -1,5 +1,5 @@
 # pretrain model
-python train.py --dataroot ./mask_all/ --name Seed42_style --random_seed 42
+python train.py --dataroot ./mask_all/ --name Seed42_style --random_seed 42 --n_epochs 10
 
 # non iterative mode on style
 # generate data
