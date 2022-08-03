@@ -67,7 +67,6 @@ if __name__ == '__main__':
     
     all_train_iterations = [0,1,2,3,7,11,15]
     for iter in range(opt.aug_iter):
-        
         # Generate new image with styleGAN
         print("Obtaining new images on iterations {:02d}".format(iter))
         newDir = "./{}_{}_{}_{}/iter_{}".format(opt.augmode, opt.adv_loss_type, opt.rank_buffer_size, opt.aug_iter, iter)
@@ -84,12 +83,13 @@ if __name__ == '__main__':
         
         # add to total dataset
         totalDataset.dataset.add(newDataset.dataset)
-    
         if iter not in all_train_iterations:
             continue
         # Train DOINN 
         if iter != 0:
-            model_past.load_networks("iteration_{}_{}_{}_{}".format(opt.augmode, opt.adv_loss_type, opt.rank_buffer_size, iter-1))
+            idx = all_train_iterations.index(iter)
+            prev_iter = all_train_iterations[idx-1]
+            model_past.load_networks("iteration_{}_{}_{}_{}".format(opt.augmode, opt.adv_loss_type, opt.rank_buffer_size, prev_iter))
         print("Start model retraining on all data {}.".format(len(totalDataset)))
         for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):
             for i, data in enumerate(totalDataset):
