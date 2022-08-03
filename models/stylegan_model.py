@@ -364,7 +364,10 @@ class StyleGANModel(BaseModel):
                 past_model.mask = img
                 past_model.forward()
                 past_model_loss = past_model.criterionLitho(past_model.real_mask, past_model.to_one_hot(real_resist))
-                loss = torch.abs(model_loss - past_model_loss).mean()
+                if dist_norm > 1e-5:
+                    loss = -torch.abs(model_loss - past_model_loss).mean() - dist_norm * norm_dist.log_prob(z).mean()
+                else:
+                    loss = -torch.abs(model_loss - past_model_loss).mean()
             else:
                 model.mask = img
                 if dist_norm > 1e-5:
@@ -432,7 +435,10 @@ class StyleGANModel(BaseModel):
                 past_model.mask = img
                 past_model.forward()
                 past_model_loss = past_model.criterionLitho(past_model.real_mask, past_model.to_one_hot(real_resist))
-                loss = torch.abs(model_loss - past_model_loss).mean()
+                if dist_norm > 1e-5:
+                    loss = -torch.abs(model_loss - past_model_loss).mean() - dist_norm * norm_dist.log_prob(noise).mean()
+                else:
+                    loss = -torch.abs(model_loss - past_model_loss).mean()
             else:
                 model.mask = img
                 if loss_type == 'pixel':
