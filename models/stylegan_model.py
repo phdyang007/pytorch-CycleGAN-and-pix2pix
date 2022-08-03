@@ -85,7 +85,7 @@ class StyleGANModel(BaseModel):
             opt (Option class)-- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
         BaseModel.__init__(self, opt)
-        self.batch = opt.batch_size // 2
+        self.batch = opt.batch_size 
         if opt.rank_buffer_size % self.batch == 0:
             self.generate_num = opt.rank_buffer_size // self.batch
         else:
@@ -317,6 +317,8 @@ class StyleGANModel(BaseModel):
         results = []
         label = torch.zeros([batch, self.netG.c_dim], device=device)
         self.netG.to(device)
+        if len(self.gpu_ids) > 1:
+            self.netG = torch.nn.DataParallel(self.netG, self.gpu_ids) 
         for i, seed in enumerate(seeds):
             z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.z_dim)).to(device)
             img = self.netG(z, label, truncation_psi=1.0, noise_mode='const')
