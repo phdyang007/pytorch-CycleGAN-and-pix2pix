@@ -86,6 +86,8 @@ class StyleGANModel(BaseModel):
         """
         BaseModel.__init__(self, opt)
         self.batch = opt.batch_size 
+        if opt.augmode != 'random' and opt.adv_loss_type == 'TOD':
+            self.batch = self.batch // 2
         if opt.rank_buffer_size % self.batch == 0:
             self.generate_num = opt.rank_buffer_size // self.batch
         else:
@@ -350,6 +352,7 @@ class StyleGANModel(BaseModel):
         if len(self.gpu_ids) > 1:
             self.netG = self.netG.module
         self.netG.cpu()
+        torch.cuda.empty_cache()
         return results
     
     def attack_style(self, z, G, model, device, past_model=None, lr_alpha=0.01, dist_norm=0.1, loss_type='houdini', quantize_aware=True, epochs=10, gradient_clip=True):
@@ -426,6 +429,7 @@ class StyleGANModel(BaseModel):
         if len(self.gpu_ids) > 1:
             self.netG = self.netG.module
         self.netG.cpu()
+        torch.cuda.empty_cache()
         return results
     
     def attack_noise(self, z, G, model, device, past_model=None, lr_alpha=1.0, dist_norm=0.1, quantize_aware=True, epochs=10, gradient_clip=True, loss_type='pixel'):
@@ -514,6 +518,7 @@ class StyleGANModel(BaseModel):
         if len(self.gpu_ids) > 1:
             self.netG = self.netG.module
         self.netG.cpu()
+        torch.cuda.empty_cache()
         return results
     
     def generate_data(self, outdir, model, method, past_model=None):
