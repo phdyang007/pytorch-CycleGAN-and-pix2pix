@@ -308,6 +308,13 @@ class StyleGANModel(BaseModel):
             
         del G, D
 
+    def write_out_single(self, args):
+        PIL.Image.fromarray(args[3], 'L').save(f'{args[0]}/seed{args[1]:04d}_{args[2]:02d}.png')
+    
+    def write_out(self, args):
+        for i in range(self.batch):
+            self.write_out_single(args[i])
+
     #TODO: get batched generation + multi-gpu
     def generate_random(self, outdir, model):
         batch = self.batch
@@ -320,7 +327,7 @@ class StyleGANModel(BaseModel):
         if len(self.gpu_ids) > 1:
             self.netG = torch.nn.DataParallel(self.netG, self.gpu_ids) 
         for i, seed in enumerate(seeds):
-            z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.z_dim)).to(device)
+            z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.module.z_dim)).to(device)
             img = self.netG(z, label, truncation_psi=1.0, noise_mode='const')
             img = self.upsampler(img)
             img = (img + 1) * 0.5
@@ -335,8 +342,11 @@ class StyleGANModel(BaseModel):
             mask_golden = (model.real_resist[:,0,:,:] * 255).to(torch.uint8)
             img_output = (model.mask[:,0,:,:] * 255).to(torch.uint8)
             img_output = torch.cat((img_output,mask_golden), 2)
+            img_output = img_output.detach().cpu().numpy()
+            args = []
             for b in range(batch):
-                PIL.Image.fromarray(img_output[b,...].detach().cpu().numpy(), 'L').save(f'{outdir}/seed{i:04d}_{b:02d}.png')
+                args.append( [outdir, i, b, img_output[b,...]] )
+            self.write_out(args)
         self.netG.cpu()
         return results
     
@@ -388,8 +398,10 @@ class StyleGANModel(BaseModel):
         results = []
         label = torch.zeros([batch, self.netG.c_dim], device=device)
         self.netG.to(device)
+        if len(self.gpu_ids) > 1:
+            self.netG = torch.nn.DataParallel(self.netG, self.gpu_ids) 
         for i, seed in enumerate(seeds):
-            z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.z_dim)).to(device)
+            z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.module.z_dim)).to(device)
             img = self.attack_style(z, self.netG, model, device=device, loss_type=self.opt.adv_loss_type, past_model=past_model) 
             model.mask = img
             model.eval()
@@ -402,8 +414,11 @@ class StyleGANModel(BaseModel):
             mask_golden = (model.real_resist[:,0,:,:] * 255).to(torch.uint8)
             img_output = (model.mask[:,0,:,:] * 255).to(torch.uint8)
             img_output = torch.cat((img_output,mask_golden), 2)
+            img_output = img_output.detach().cpu().numpy()
+            args = []
             for b in range(batch):
-                PIL.Image.fromarray(img_output[b,...].detach().cpu().numpy(), 'L').save(f'{outdir}/seed{i:04d}_{b:02d}.png')
+                args.append( [outdir, i, b, img_output[b,...]] )
+            self.write_out(args)
         self.netG.cpu()
         return results
     
@@ -467,8 +482,10 @@ class StyleGANModel(BaseModel):
         results = []
         label = torch.zeros([batch, self.netG.c_dim], device=device)
         self.netG.to(device)
+        if len(self.gpu_ids) > 1:
+            self.netG = torch.nn.DataParallel(self.netG, self.gpu_ids) 
         for i, seed in enumerate(seeds):
-            z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.z_dim)).to(device)
+            z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.module.z_dim)).to(device)
             img = self.attack_noise(z, self.netG, model, device, loss_type=self.opt.adv_loss_type, past_model=past_model)
             model.mask = img
             model.eval()
@@ -481,8 +498,12 @@ class StyleGANModel(BaseModel):
             img_output = (model.mask[:,0,:,:] * 255).to(torch.uint8)
             mask_golden = (model.real_resist[:,0,:,:] * 255).to(torch.uint8)
             img_output = torch.cat((img_output,mask_golden), 2)
+            img_output = img_output.detach().cpu().numpy()
+            args = []
             for b in range(batch):
-                PIL.Image.fromarray(img_output[b,...].detach().cpu().numpy(), 'L').save(f'{outdir}/seed{i:04d}_{b:02d}.png')
+                args.append( [outdir, i, b, img_output[b,...]] )
+            self.write_out(args)
+        self.netG.cpu()
         return results
     
     def generate_data(self, outdir, model, method, past_model=None):
