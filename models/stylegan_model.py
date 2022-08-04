@@ -347,6 +347,8 @@ class StyleGANModel(BaseModel):
             for b in range(batch):
                 args.append( [outdir, i, b, img_output[b,...]] )
             self.write_out(args)
+        if len(self.gpu_ids) > 1:
+            self.netG = self.netG.module
         self.netG.cpu()
         return results
     
@@ -354,7 +356,10 @@ class StyleGANModel(BaseModel):
         batch = self.batch
         upsampler = torch.nn.Upsample(scale_factor=8, mode='bicubic')
         G.eval(), model.eval()
-        label = torch.zeros([batch, G.module.c_dim], device=device)
+        if len(self.gpu_ids) > 1:
+            label = torch.zeros([batch, G.module.c_dim], device=device)
+        else:
+            label = torch.zeros([batch, G.c_dim], device=device)
         optimizer = torch.optim.Adam([z], lr=lr_alpha)
         z.requires_grad = True
         norm_dist = Normal(torch.tensor([0.0], device=device), torch.tensor([1.0], device=device))
@@ -399,9 +404,6 @@ class StyleGANModel(BaseModel):
         self.netG.to(device)
         if len(self.gpu_ids) > 1:
             self.netG = torch.nn.DataParallel(self.netG, self.gpu_ids) 
-            label = torch.zeros([batch, self.netG.module.c_dim], device=device)
-        else:
-            label = torch.zeros([batch, self.netG.c_dim], device=device)
         for i, seed in enumerate(seeds):
             z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.module.z_dim)).to(device)
             img = self.attack_style(z, self.netG, model, device=device, loss_type=self.opt.adv_loss_type, past_model=past_model) 
@@ -421,6 +423,8 @@ class StyleGANModel(BaseModel):
             for b in range(batch):
                 args.append( [outdir, i, b, img_output[b,...]] )
             self.write_out(args)
+        if len(self.gpu_ids) > 1:
+            self.netG = self.netG.module
         self.netG.cpu()
         return results
     
@@ -430,7 +434,10 @@ class StyleGANModel(BaseModel):
         noise, noise_block = noise_module.generate(batch)
         upsampler = torch.nn.Upsample(scale_factor=8, mode='bicubic')
         G.eval(), model.eval()
-        label = torch.zeros([batch, G.module.c_dim], device=device)
+        if len(self.gpu_ids) > 1:
+            label = torch.zeros([batch, G.module.c_dim], device=device)
+        else:
+            label = torch.zeros([batch, G.c_dim], device=device)
         optimizer = torch.optim.Adam([noise], lr=lr_alpha)
         noise.requires_grad = True
         original = None
@@ -484,10 +491,7 @@ class StyleGANModel(BaseModel):
         results = []
         self.netG.to(device)
         if len(self.gpu_ids) > 1:
-            self.netG = torch.nn.DataParallel(self.netG, self.gpu_ids) 
-            label = torch.zeros([batch, self.netG.module.c_dim], device=device)
-        else:
-            label = torch.zeros([batch, self.netG.c_dim], device=device)
+            self.netG = torch.nn.DataParallel(self.netG, self.gpu_ids)       
         for i, seed in enumerate(seeds):
             z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.module.z_dim)).to(device)
             img = self.attack_noise(z, self.netG, model, device, loss_type=self.opt.adv_loss_type, past_model=past_model)
@@ -507,6 +511,8 @@ class StyleGANModel(BaseModel):
             for b in range(batch):
                 args.append( [outdir, i, b, img_output[b,...]] )
             self.write_out(args)
+        if len(self.gpu_ids) > 1:
+            self.netG = self.netG.module
         self.netG.cpu()
         return results
     
