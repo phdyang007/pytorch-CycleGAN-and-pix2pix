@@ -354,7 +354,7 @@ class StyleGANModel(BaseModel):
         batch = self.batch
         upsampler = torch.nn.Upsample(scale_factor=8, mode='bicubic')
         G.eval(), model.eval()
-        label = torch.zeros([batch, G.c_dim], device=device)
+        label = torch.zeros([batch, G.module.c_dim], device=device)
         optimizer = torch.optim.Adam([z], lr=lr_alpha)
         z.requires_grad = True
         norm_dist = Normal(torch.tensor([0.0], device=device), torch.tensor([1.0], device=device))
@@ -424,11 +424,11 @@ class StyleGANModel(BaseModel):
     
     def attack_noise(self, z, G, model, device, past_model=None, lr_alpha=1.0, dist_norm=0.1, quantize_aware=True, epochs=10, gradient_clip=True, loss_type='pixel'):
         batch = self.batch
-        noise_module = Noise(G.synthesis.block_resolutions, device)
+        noise_module = Noise(G.module.synthesis.block_resolutions, device)
         noise, noise_block = noise_module.generate(batch)
         upsampler = torch.nn.Upsample(scale_factor=8, mode='bicubic')
         G.eval(), model.eval()
-        label = torch.zeros([batch, G.c_dim], device=device)
+        label = torch.zeros([batch, G.module.c_dim], device=device)
         optimizer = torch.optim.Adam([noise], lr=lr_alpha)
         noise.requires_grad = True
         original = None
