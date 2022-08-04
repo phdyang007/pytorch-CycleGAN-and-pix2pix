@@ -396,10 +396,12 @@ class StyleGANModel(BaseModel):
         seeds = list(range(self.seed, self.seed + self.generate_num)) 
         self.seed += self.generate_num
         results = []
-        label = torch.zeros([batch, self.netG.c_dim], device=device)
         self.netG.to(device)
         if len(self.gpu_ids) > 1:
             self.netG = torch.nn.DataParallel(self.netG, self.gpu_ids) 
+            label = torch.zeros([batch, self.netG.module.c_dim], device=device)
+        else:
+            label = torch.zeros([batch, self.netG.c_dim], device=device)
         for i, seed in enumerate(seeds):
             z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.module.z_dim)).to(device)
             img = self.attack_style(z, self.netG, model, device=device, loss_type=self.opt.adv_loss_type, past_model=past_model) 
@@ -480,10 +482,12 @@ class StyleGANModel(BaseModel):
         seeds = list(range(self.seed, self.seed + self.generate_num)) 
         self.seed += self.generate_num
         results = []
-        label = torch.zeros([batch, self.netG.c_dim], device=device)
         self.netG.to(device)
         if len(self.gpu_ids) > 1:
             self.netG = torch.nn.DataParallel(self.netG, self.gpu_ids) 
+            label = torch.zeros([batch, self.netG.module.c_dim], device=device)
+        else:
+            label = torch.zeros([batch, self.netG.c_dim], device=device)
         for i, seed in enumerate(seeds):
             z = torch.from_numpy(np.random.RandomState(seed).randn(batch, self.netG.module.z_dim)).to(device)
             img = self.attack_noise(z, self.netG, model, device, loss_type=self.opt.adv_loss_type, past_model=past_model)
